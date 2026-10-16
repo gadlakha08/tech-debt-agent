@@ -1,0 +1,3 @@
+# Agents act only through one MCP server with stage-scoped tokens
+
+Every agent-facing capability (`submit_finding`, `get_dossier`, `amend_dossier`, `get_debt_item`, ...) is exposed by one MCP server backed by the Debt Service. Both Agent Runtimes and all plugin skills use it, because Codex cannot register in-process tools. Guardrails are enforced on the server side: each Scan stage gets a token scoped to the operations it may perform, and Zod schemas validate every call. Scans also run read-only (sandbox / tool allowlist). Runtime hooks are defense in depth only, because their formats and trust models differ between Claude and Codex.
