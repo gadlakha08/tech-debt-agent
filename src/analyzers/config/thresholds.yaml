@@ -1,4 +1,4 @@
-# Single place to tune analyzer noise (Person B). Bundles below threshold are never emitted.
+# Single place to tune analyzer noise (Part 2). Bundles below threshold are never emitted.
 code:
   complexity: 10
   maxDepth: 3

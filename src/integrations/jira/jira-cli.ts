@@ -3,5 +3,5 @@ export const ALLOWED_SUBCOMMANDS = ["search", "create", "update", "comment", "ep
 
 /** Runs `jira-cli --instance techdebt-bot --format json <args>` after checking the allow-list. */
 export async function runJiraCli(_args: string[], _instance = "techdebt-bot"): Promise<unknown> {
-  throw new Error("not implemented: runJiraCli (Person B, D1-1)");
+  throw new Error("not implemented: runJiraCli (Part 2, D1-1)");
 }

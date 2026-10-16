@@ -4,5 +4,5 @@
  * Cache it and refresh 120 s before expires_in runs out. Never log the token.
  */
 export async function getCircuitToken(): Promise<string> {
-  throw new Error("not implemented: getCircuitToken (Person A, D1-1)");
+  throw new Error("not implemented: getCircuitToken (Part 1, D1-1)");
 }

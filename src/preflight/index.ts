@@ -9,5 +9,5 @@ export interface PreflightResult {
 
 /** Runs before any nano call. Interactive only for the hackathon; headless mode is post-hackathon. */
 export async function preflight(_profile: RepoProfile, _opts: { interactive: true }): Promise<PreflightResult> {
-  throw new Error("not implemented: preflight (Person B, D1-3)");
+  throw new Error("not implemented: preflight (Part 2, D1-3)");
 }

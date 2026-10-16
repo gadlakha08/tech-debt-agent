@@ -1,7 +1,7 @@
-# Hackathon Plan: Person B, Edges
+# Hackathon Plan: Part 2, Edges
 
 You own everything that touches the outside world: the scanned repo, the analysis tools, Jira access, preflight, the setup flow, and the developer-facing skills.
-Partner: **Person A (Pipeline Brain)** owns everything that calls gpt-5-nano, plus ranking and ticketing. See [`hackathon-person-a.md`](hackathon-person-a.md).
+Other part: **Part 1 (Pipeline Brain)** owns everything that calls gpt-5-nano, plus ranking and ticketing. See [`hackathon-part-1.md`](hackathon-part-1.md).
 Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary is in [`CONTEXT.md`](../../CONTEXT.md).
 
 ## You own
@@ -19,11 +19,11 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 | `plugin/skills/techdebt-ask/` | Q&A on a ticket; generates the plan if it's missing |
 | `plugin/skills/techdebt-implement/` | Drift check → branch → code → tests → PR → Jira transition |
 | `plugin/skills/techdebt-grill-implement/` | Grill on edge cases → amended plan → implement |
-| `fixtures/` | Hand-written evidence so A can start before the analyzers exist |
+| `fixtures/` | Hand-written evidence so Part 1 can start before the analyzers exist |
 
-## Contracts with Person A
+## Contracts with Part 1
 
-**A consumes from you:**
+**Part 1 consumes from you:**
 - `fixtures/evidence-admin-mfe.json`, about 20 bundles across all 5 categories. **Push at kickoff.**
 - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>`. **Real TS output by Sync 1, Java by Sync 2.**
 - `checkout(repoPath): Promise<{ worktree, sha, defaultBranch }>` and `churn(ctx): Promise<Record<file, commitCount>>`, **by end of D1-1**
@@ -31,7 +31,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - `preflight(profile, { interactive }): Promise<{ ok, fallbacks: { noAttach, noEpicLink, noComments } }>`, **by Sync 2**
 - `skills/jira-autonomous/SKILL.md`, **by end of D2-1**
 
-**You consume from A:**
+**You consume from Part 1:**
 - `getCircuitToken()` for the CircuIT check in preflight (end of D1-1)
 - Real tickets for testing the skills (Sync 3). Until then, test on one hand-made ticket.
 
@@ -50,9 +50,9 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 
 ---
 
-## Kickoff (D1, first 45 min, with A)
+## Kickoff (D1, first 45 min, with Part 1)
 - [ ] Scaffold together and write `src/domain/schemas.ts`; agree the interface stubs
-- [ ] **Push `fixtures/evidence-admin-mfe.json`** with about 20 realistic bundles covering all 5 categories, so A is unblocked
+- [ ] **Push `fixtures/evidence-admin-mfe.json`** with about 20 realistic bundles covering all 5 categories, so Part 1 is unblocked
 
 ## Day 1
 
@@ -62,7 +62,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
   - [ ] Create a temp worktree, `git worktree add <tmp> origin/<branch>`, and record the SHA. Remove the worktree when the scan ends.
   - [ ] `churn()` in `src/integrations/git/churn.ts`: `git log --since=180.days --name-only --pretty=format:` → commits per file
   - [ ] Run `python3 ~/.agents/skills/acquire-codebase-knowledge/scripts/scan.py --output <tmp>/scan.txt` **inside the worktree** and put a stack summary into `ScanContext`
-  - [ ] Push `checkout` + `churn` for A
+  - [ ] Push `checkout` + `churn` for Part 1
 - [ ] `src/integrations/jira/jira-cli.ts`:
   - [ ] Wrap `jira-cli --instance techdebt-bot --format json <cmd>` with an allow-list: `search`, `create`, `update`, `comment`, `epics link`, `whoami`
 - [ ] `src/integrations/jira/jira-rest.ts`:
@@ -76,15 +76,15 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
   - [ ] ESLint with a project-independent flat config: `complexity>10`, `max-depth>3`, `max-lines-per-function>50`, `max-lines>500`
   - [ ] `jscpd --reporters json`
   - [ ] TODO/FIXME/HACK grep, grouped per file
-- [ ] **architecture**: `madge --circular --json`, plus fan-in/fan-out from `madge --json`. Record fan-in in `metrics.fanIn` for every module (A needs it for Reach).
+- [ ] **architecture**: `madge --circular --json`, plus fan-in/fan-out from `madge --json`. Record fan-in in `metrics.fanIn` for every module (Part 1 needs it for Reach).
 - [ ] **dependencies**: `npm outdated --json`; flag packages one or more majors behind, and deprecated ones
 - [ ] **testing**: source files with no matching `*.spec.*` / `*.test.*`; parse the coverage summary if present
-- [ ] **ops**: hardcoded `http(s)://` or `localhost` in non-test source. Secret-shaped literals become `ops` bundles with `rule: "secret-literal"`, and A's classifier turns them into Defects.
+- [ ] **ops**: hardcoded `http(s)://` or `localhost` in non-test source. Secret-shaped literals become `ops` bundles with `rule: "secret-literal"`, and Part 1's classifier turns them into Defects.
 - [ ] `runAnalyzers()` dispatches by `ctx.stack`
 - [ ] **Replace the fixture** with real `admin-mfe` output: `fixtures/evidence-admin-mfe.real.json`
 
 ### ✅ Sync 1 (~15 min)
-- [ ] Merge. A runs classify on your real evidence. Note which bundle types A reports as noisy.
+- [ ] Merge. Part 1 runs classify on your real evidence. Note which bundle types Part 1 reports as noisy.
 
 ### D1-3: Java analyzers + preflight (~2 h)
 - [ ] Java analyzers on `cspe-sc-feature-service`:
@@ -109,7 +109,7 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
   - [ ] For each gap, **print and copy (`clipboardy`)** the admin request: *"Please add user techdebt-bot to the Developers role in project `<KEY>` (needs: …)."* It never sends the request itself.
   - [ ] **Interactive**: `[r]` re-check / `[i]` use the fallback / `[q]` quit. Blocking gaps offer only `[r]` and `[q]`. Interactive only for the hackathon; headless mode is post-hackathon.
   - [ ] Add the `techdebt doctor` command
-- [ ] Push the `src/integrations/jira/` client for A
+- [ ] Push the `src/integrations/jira/` client for Part 1
 
 ### ✅ Sync 2: evening (~1–2 h, together)
 - [ ] `techdebt doctor`, then `techdebt scan --dry-run` on `admin-mfe`, then on `feature-service`
@@ -130,8 +130,8 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
     - "the saved Repo Profile is the user's confirmation"
     - "always use `--instance techdebt-bot`"
     - "always JQL-search `labels = td-fp-<fp>` before creating"
-  - [ ] Push it for A
-- [ ] Create **one hand-made test ticket** (`scripts/fake-ticket.ts`) in `<JIRA-KEY>`, shaped like A's: labels, description, and attached `context.md` / `impact.md`
+  - [ ] Push it for Part 1
+- [ ] Create **one hand-made test ticket** (`scripts/fake-ticket.ts`) in `<JIRA-KEY>`, shaped like Part 1's: labels, description, and attached `context.md` / `impact.md`
 - [ ] Start `plugin/skills/techdebt-ask/SKILL.md` against that ticket
 
 ### D2-2: `ask` + `implement` skills (~2 h)
@@ -150,7 +150,7 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
 - [ ] Both skills declare that they work in **Claude Code and Codex**: plain `SKILL.md`, no runtime-specific tools
 
 ### ✅ Sync 3 (~20 min)
-- [ ] Run `ask` and `implement` on **A's real tickets**. Pick the demo ticket: small Effort, clear evidence, tests exist.
+- [ ] Run `ask` and `implement` on **Part 1's real tickets**. Pick the demo ticket: small Effort, clear evidence, tests exist.
 
 ### D2-3: `grill-implement` + demo PR (~2 h)
 - [ ] **`techdebt-grill-implement <KEY>`**:
@@ -168,15 +168,15 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
 
 ## If you fall behind
 - Drop `grill-implement` first.
-- A takes the Java Architecture analyzer, or it gets dropped.
+- Part 1 takes the Java Architecture analyzer, or it gets dropped.
 - Use `pom.xml` parsing instead of `mvn versions`.
 - Hand-write the Repo Profile YAML instead of the `setup` prompts. Keep the preflight checks and the printed message, and drop the `[r]` loop.
 
 ## Risks you own
 | Risk | Mitigation |
 |---|---|
-| Analyzers produce too much noise | Thresholds in one config file; tune them in D2 using A's noise list |
+| Analyzers produce too much noise | Thresholds in one config file; tune them in D2 using Part 1's noise list |
 | `mvn` is slow or has no network | `pom.xml` fallback |
 | PMD not installed on the demo machine | Check in `doctor`, and install on day 1 |
-| Generic Jira user lacks permissions | Preflight catches it, prints the admin request, and A's ticketer applies the fallbacks |
+| Generic Jira user lacks permissions | Preflight catches it, prints the admin request, and Part 1's ticketer applies the fallbacks |
 | `implement` breaks the build live | Demo the PR you prepared in D2-3 |

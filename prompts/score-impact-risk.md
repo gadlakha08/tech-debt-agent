@@ -1,4 +1,4 @@
-<!-- Person A, D1-3. Scores Impact and Risk for one Debt Item from anchored descriptions. -->
+<!-- Part 1, D1-3. Scores Impact and Risk for one Debt Item from anchored descriptions. -->
 Score this Debt Item. Pick each score from the anchors; justify in one line citing the evidence.
 
 Impact (how much it slows or endangers work):

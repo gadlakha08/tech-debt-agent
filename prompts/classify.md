@@ -1,4 +1,4 @@
-<!-- Person A, D1-2. System prompt for stages/classify.ts. One EvidenceBundle per call. -->
+<!-- Part 1, D1-2. System prompt for stages/classify.ts. One EvidenceBundle per call. -->
 You classify one piece of static-analysis evidence from a {{stack}} repository.
 
 Stack summary:

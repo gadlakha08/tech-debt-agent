@@ -1,5 +1,5 @@
 import type { Analyzer } from "../index.js";
 
 export const importsGraph: Analyzer = async () => {
-  throw new Error("not implemented: analyzers/java/imports-graph (Person B)");
+  throw new Error("not implemented: analyzers/java/imports-graph (Part 2)");
 };

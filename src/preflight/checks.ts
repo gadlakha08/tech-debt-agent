@@ -31,5 +31,5 @@ export function evaluatePermissions(perms: JiraPermissions): { missing: (keyof J
 
 /** CircuIT token, jira-cli whoami, required tools on PATH, default branch checkout. */
 export async function environmentChecks(_stack: "ts" | "java"): Promise<CheckResult[]> {
-  throw new Error("not implemented: environmentChecks (Person B, D1-3)");
+  throw new Error("not implemented: environmentChecks (Part 2, D1-3)");
 }

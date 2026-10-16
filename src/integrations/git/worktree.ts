@@ -6,9 +6,9 @@ export interface Checkout {
 
 /** Temp worktree of origin/main or origin/master; never touches the user's working copy. */
 export async function checkout(_repoPath: string): Promise<Checkout> {
-  throw new Error("not implemented: checkout (Person B, D1-1)");
+  throw new Error("not implemented: checkout (Part 2, D1-1)");
 }
 
 export async function removeWorktree(_repoPath: string, _worktree: string): Promise<void> {
-  throw new Error("not implemented: removeWorktree (Person B, D1-1)");
+  throw new Error("not implemented: removeWorktree (Part 2, D1-1)");
 }

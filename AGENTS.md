@@ -9,8 +9,8 @@ Conventions for humans and coding agents working in this repo. Vocabulary is in 
 - `src/cli/`: thin commander wiring; calls `pipeline`, `preflight`, `profile`.
 
 ## Ownership (hackathon)
-- **Person A:** `integrations/llm`, `pipeline/`, `report/`, `prompts/`, `templates/`, `cli/commands/scan.ts`.
-- **Person B:** `analyzers/`, `integrations/jira`, `integrations/git`, `preflight/`, `profile/`, `skills/`, `plugin/`, `fixtures/`, `cli/commands/{setup,doctor}.ts`.
+- **Part 1:** `integrations/llm`, `pipeline/`, `report/`, `prompts/`, `templates/`, `cli/commands/scan.ts`.
+- **Part 2:** `analyzers/`, `integrations/jira`, `integrations/git`, `preflight/`, `profile/`, `skills/`, `plugin/`, `fixtures/`, `cli/commands/{setup,doctor}.ts`.
 - **Shared:** `src/domain/schemas.ts` and `src/cli/index.ts`. Ping your partner before changing them.
 
 ## Code

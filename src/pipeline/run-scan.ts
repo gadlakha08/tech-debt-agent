@@ -11,5 +11,5 @@ export interface ScanOptions {
  * → 6 score → 7 cut → 8 dossier → 9 ticket → 10 report. --dry-run stops before Jira.
  */
 export async function runScan(_opts: ScanOptions): Promise<void> {
-  throw new Error("not implemented: runScan (Person A)");
+  throw new Error("not implemented: runScan (Part 1)");
 }

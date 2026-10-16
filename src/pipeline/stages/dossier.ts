@@ -6,5 +6,5 @@ export const IMPACT_HEADINGS = ["Rubric scores", "Severity", "Effort", "Who / wh
 
 /** Fills templates/dossier/*.md per Debt Item in the Cut; regenerates once if a heading is missing. */
 export async function buildDossiers(_ctx: ScanContext, _cut: DebtItem[], _usage: UsageMeter): Promise<Dossier[]> {
-  throw new Error("not implemented: buildDossiers (Person A, D2-1)");
+  throw new Error("not implemented: buildDossiers (Part 1, D2-1)");
 }

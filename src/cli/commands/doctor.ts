@@ -6,6 +6,6 @@ export function registerDoctor(program: Command): void {
     .description("Run preflight on its own: environment and Jira permissions")
     .argument("<repo>", "repo name")
     .action(async () => {
-      throw new Error("not implemented: doctor (Person B, D1-3)");
+      throw new Error("not implemented: doctor (Part 2, D1-3)");
     });
 }

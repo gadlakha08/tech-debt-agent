@@ -8,5 +8,5 @@ export async function score(
   _churn: Record<string, number>,
   _usage: UsageMeter,
 ): Promise<DebtItem[]> {
-  throw new Error("not implemented: score (Person A, D1-3)");
+  throw new Error("not implemented: score (Part 1, D1-3)");
 }

@@ -13,5 +13,5 @@ export interface ScanReport {
 
 /** Writes report.md + report.json into ctx.runDir. */
 export async function writeReport(_runDir: string, _report: ScanReport): Promise<{ mdPath: string; jsonPath: string }> {
-  throw new Error("not implemented: writeReport (Person A, D1-3)");
+  throw new Error("not implemented: writeReport (Part 1, D1-3)");
 }

@@ -3,7 +3,7 @@ name: techdebt-implement
 description: Implement a tech-debt Jira ticket from its latest plan, after a drift check, and open a PR. Use when the user runs /techdebt-implement <KEY>.
 ---
 
-<!-- Person B, D2-2. -->
+<!-- Part 2, D2-2. -->
 1. Load the ticket, attachments and latest `[techdebt-plan vN]` comment (generate the plan as in techdebt-ask if missing).
 2. Drift check: `git diff --stat <scannedSHA>..HEAD -- <evidence files>`. If anything changed, stop and ask.
 3. Branch `td/<KEY>-<slug>`.

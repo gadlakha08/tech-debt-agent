@@ -1,7 +1,7 @@
-# Hackathon Plan: Person A, Pipeline Brain
+# Hackathon Plan: Part 1, Pipeline Brain
 
 You own everything that calls gpt-5-nano and all the ranking logic: turning evidence into ranked, ticketed Debt Items.
-Partner: **Person B (Edges)** owns the scanned repo, Jira access, preflight, and the developer skills. See [`hackathon-person-b.md`](hackathon-person-b.md).
+Other part: **Part 2 (Edges)** owns the scanned repo, Jira access, preflight, and the developer skills. See [`hackathon-part-2.md`](hackathon-part-2.md).
 Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary is in [`CONTEXT.md`](../../CONTEXT.md).
 
 ## You own
@@ -20,9 +20,9 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 | `src/cli/commands/scan.ts`, `src/pipeline/run-scan.ts` | Wires stages 0–10 together |
 | `prompts/`, `templates/` | nano prompts and Dossier / Jira description templates |
 
-## Contracts with Person B
+## Contracts with Part 2
 
-**You consume from B:**
+**You consume from Part 2:**
 - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>`. Until it lands (Sync 1), use `fixtures/evidence-admin-mfe.json`.
 - `checkout(repoPath): Promise<{ worktree, sha, defaultBranch }>`
 - `churn(ctx): Promise<Record<file, commitCount>>`
@@ -30,19 +30,19 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - `jira.search / create / update / comment / epicLink / attach` from `src/integrations/jira/`. Until it lands, stub it with an in-memory fake.
 - `skills/jira-autonomous/SKILL.md` (lands D2-1)
 
-**B consumes from you:**
-- `getCircuitToken(): Promise<string>`, needed by B's preflight. **Deliver by end of D1-1.**
-- Real Jira tickets from your ticketer, needed by B's skills. **Deliver at Sync 3.**
+**Part 2 consumes from you:**
+- `getCircuitToken(): Promise<string>`, needed by Part 2's preflight. **Deliver by end of D1-1.**
+- Real Jira tickets from your ticketer, needed by Part 2's skills. **Deliver at Sync 3.**
 
 **Shared:** `src/domain/schemas.ts`, written together at kickoff. Ping before changing it.
 
 ---
 
-## Kickoff (D1, first 45 min, with B)
+## Kickoff (D1, first 45 min, with Part 2)
 - [ ] Scaffold together: `package.json`, `tsconfig`, commander, zod, eslint; push `main`
 - [ ] Write `src/domain/schemas.ts` together: `EvidenceBundle`, `Finding`, `Defect`, `DebtItem`, `RubricScores`, `Dossier`, `RepoProfile`, `ScanContext`
 - [ ] Agree the interface signatures above, and put empty exported stubs in place so both sides compile
-- [ ] Wait for B to push `fixtures/evidence-admin-mfe.json` (~20 bundles)
+- [ ] Wait for Part 2 to push `fixtures/evidence-admin-mfe.json` (~20 bundles)
 
 ## Day 1
 
@@ -51,7 +51,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
   - [ ] Token fetch: POST to `CIRCUIT_LLM_TOKEN_URL` with Basic `clientId:clientSecret` and `grant_type=client_credentials`. Cache the token and refresh it 120 s before `expires_in` runs out.
   - [ ] Call `POST {CIRCUIT_LLM_CHAT_URL}/openai/deployments/{CIRCUIT_LLM_DEPLOYMENT}/chat/completions`. Send header `api-key: <token>` and body `user: JSON.stringify({ appkey })`. **Never send `temperature`.**
   - [ ] Capture `usage.prompt_tokens` / `completion_tokens` per call, tagged by stage name
-  - [ ] Export `getCircuitToken()` from `circuit-token.ts` for B and push it
+  - [ ] Export `getCircuitToken()` from `circuit-token.ts` for Part 2 and push it
 - [ ] **Probe structured output** with `scripts/probe-circuit.ts`: send one request with `response_format: { type: "json_schema", ... }`. If it's rejected, use a forced tool call (`tool_choice` = one function whose parameters are the schema). Write the result in the README.
 - [ ] `src/integrations/llm/agent-loop.ts`: `runAgent({ system, user, tools, outputSchema, maxSteps = 8 })`:
   - [ ] executes tool calls and appends the results
@@ -71,13 +71,13 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - **Done when:** running against the fixtures gives a list of Debt Items, with the Defects kept separate.
 
 ### ✅ Sync 1 (~15 min)
-- [ ] Merge both branches. Run classify + consolidate on **B's real `admin-mfe` evidence**.
-- [ ] Tell B about noisy bundle types, e.g. "TODO bundles are 80% discard, raise the threshold".
+- [ ] Merge both branches. Run classify + consolidate on **Part 2's real `admin-mfe` evidence**.
+- [ ] Tell Part 2 about noisy bundle types, e.g. "TODO bundles are 80% discard, raise the threshold".
 
 ### D1-3: Rubric + Cut + Report (~2 h)
 - [ ] `src/domain/rubric.ts` (pure score math + bands) and `src/pipeline/stages/score.ts` (nano Impact/Risk call):
   - [ ] **Reach**: fan-in percentile from `bundle.metrics.fanIn` → 1–5
-  - [ ] **Churn**: commit-count percentile of the affected files, from B's `churn()` → 1–5
+  - [ ] **Churn**: commit-count percentile of the affected files, from Part 2's `churn()` → 1–5
   - [ ] **Effort**: affected LOC <50 → S, <300 → M, <1000 → L, else XL
   - [ ] **Impact, Risk**: one nano call per Debt Item. Choose 1–5 from the anchored descriptions and give a one-line justification citing the evidence.
   - [ ] **Severity** = Impact + Reach + Churn + Risk: ≥15 High, ≥9 Medium, else Low
@@ -91,9 +91,9 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - **Done when:** `techdebt scan --dry-run <admin-mfe>` writes a report with a ranked Cut.
 
 ### ✅ Sync 2: evening (~1–2 h, together)
-- [ ] `techdebt doctor` (B's) passes
+- [ ] `techdebt doctor` (Part 2's) passes
 - [ ] `techdebt scan --dry-run` on `cspe-csp-admin-mfe`, then on `cspe-sc-feature-service`
-- [ ] Fix what breaks. Note analyzer noise for B to tune tomorrow.
+- [ ] Fix what breaks. Note analyzer noise for Part 2 to tune tomorrow.
 
 **Day 1 exit:** the feature-service dry run prints 10–15 ranked Debt Items with evidence, scores and token cost.
 
@@ -108,7 +108,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - **Done when:** every item in the Cut has both files with all their headings.
 
 ### D2-2: Ticketer + first live scan (~2 h)
-- [ ] `src/pipeline/stages/ticket.ts`, using B's `src/integrations/jira/` client and the `skills/jira-autonomous/SKILL.md` text as the system prompt:
+- [ ] `src/pipeline/stages/ticket.ts`, using Part 2's `src/integrations/jira/` client and the `skills/jira-autonomous/SKILL.md` text as the system prompt:
   - [ ] Find the Epic `<repo>-tech-debts` by JQL, or create it
   - [ ] For each Debt Item:
     - [ ] The agent **must JQL-search `labels = td-fp-<fp>` first**. If a ticket exists, comment on it (skip the comment if `noComments`).
@@ -123,7 +123,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - **Done when:** the Epic holds 10–15 tickets with labels, priority and attachments.
 
 ### ✅ Sync 3 (~20 min)
-- [ ] Give B the ticket keys. B runs `/techdebt-ask` and `/techdebt-implement` on real tickets.
+- [ ] Give Part 2 the ticket keys. Part 2 runs `/techdebt-ask` and `/techdebt-implement` on real tickets.
 - [ ] **Re-run the scan → 0 new tickets** (comments only). This is the demo's credibility moment.
 
 ### D2-3: Tune + fallback recording (~2 h)
@@ -138,13 +138,13 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 ---
 
 ## If you fall behind
-- Hand `src/report/` to B (it's pure formatting from `DebtItem[]`).
+- Hand `src/report/` to Part 2 (it's pure formatting from `DebtItem[]`).
 - Drop the Impact/Risk nano call and default both to 3. Severity then comes only from Reach + Churn.
 
 ## Risks you own
 | Risk | Mitigation |
 |---|---|
 | Gateway rejects `json_schema` | Forced tool call (decided in D1-1) |
-| nano gives low-quality classifications | Small bundles, anchored prompts, allow `discard`, tell B which analyzers are noisy |
+| nano gives low-quality classifications | Small bundles, anchored prompts, allow `discard`, tell Part 2 which analyzers are noisy |
 | Duplicate tickets on re-run | JQL dedup is mandatory in the agent prompt **and** checked again in code before `create` |
 | Scan too slow live | `p-limit(8)`, recorded fallback run |

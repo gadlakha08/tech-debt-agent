@@ -3,5 +3,5 @@ import type { UsageMeter } from "../../integrations/llm/usage.js";
 
 /** One nano call per bundle, 8 in parallel. Security issues and bugs → Defect, never Finding. */
 export async function classify(_ctx: ScanContext, _bundles: EvidenceBundle[], _usage: UsageMeter): Promise<Classification[]> {
-  throw new Error("not implemented: classify (Person A, D1-2)");
+  throw new Error("not implemented: classify (Part 1, D1-2)");
 }

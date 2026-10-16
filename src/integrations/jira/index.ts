@@ -32,7 +32,7 @@ export interface JiraClient {
   myPermissions(projectKey: string): Promise<JiraPermissions>;
 }
 
-/** In-memory fake so Person A can build the ticketer before the real client lands. */
+/** In-memory fake so Part 1 can build the ticketer before the real client lands. */
 export function createFakeJiraClient(): JiraClient & { issues: Map<string, JiraIssue & { comments: string[] }> } {
   const issues = new Map<string, JiraIssue & { comments: string[] }>();
   let seq = 0;

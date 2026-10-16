@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Shared contract between Person A and Person B. Ping your partner before changing it.
+// Shared contract between Part 1 and Part 2. Ping your partner before changing it.
 
 export const DebtCategory = z.enum(["code", "architecture", "dependencies", "testing", "ops"]);
 export type DebtCategory = z.infer<typeof DebtCategory>;
@@ -14,7 +14,7 @@ export type Severity = z.infer<typeof Severity>;
 export const Effort = z.enum(["S", "M", "L", "XL"]);
 export type Effort = z.infer<typeof Effort>;
 
-/** Deterministic analyzer output (Person B). */
+/** Deterministic analyzer output (Part 2). */
 export const EvidenceBundle = z.object({
   category: DebtCategory,
   rule: z.string(), // e.g. "complexity", "god-class", "outdated-major", "circular-import"
@@ -31,7 +31,7 @@ export const EvidenceBundle = z.object({
 });
 export type EvidenceBundle = z.infer<typeof EvidenceBundle>;
 
-/** nano classification of one EvidenceBundle (Person A). */
+/** nano classification of one EvidenceBundle (Part 1). */
 export const Finding = z.object({
   title: z.string(),
   description: z.string(),

@@ -20,5 +20,5 @@ export interface RunAgentOptions<T extends z.ZodType> {
 
 /** Tool-calling loop on CircuIT chat completions. Zod-validates the final output, retrying once with the error. */
 export async function runAgent<T extends z.ZodType>(_opts: RunAgentOptions<T>): Promise<z.infer<T>> {
-  throw new Error("not implemented: runAgent (Person A, D1-1)");
+  throw new Error("not implemented: runAgent (Part 1, D1-1)");
 }

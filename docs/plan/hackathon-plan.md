@@ -52,32 +52,32 @@ tech-debt-agent/
 ├── src/
 │   ├── cli/                       (shared) commander entry; each person registers only their own commands
 │   │   ├── index.ts
-│   │   └── commands/              scan.ts (A), setup.ts (B), doctor.ts (B)
+│   │   └── commands/              scan.ts (Part 1), setup.ts (Part 2), doctor.ts (Part 2)
 │   ├── domain/                    (shared, pure: no I/O) Zod schemas + ranking math
 │   │   ├── schemas.ts             EvidenceBundle, Finding, Defect, DebtItem, RubricScores, Dossier, RepoProfile, ScanContext
 │   │   ├── fingerprint.ts         sha1(category|rule|symbolPath).slice(0,10)
 │   │   ├── rubric.ts              Reach / Churn / Effort, Severity bands
 │   │   └── cut.ts                 High + Medium, floor 10, cap 15
-│   ├── pipeline/                  (A) stage orchestration
+│   ├── pipeline/                  (Part 1) stage orchestration
 │   │   ├── run-scan.ts            stages 0–10
 │   │   └── stages/                classify, consolidate, score (nano Impact/Risk), dossier, ticket
-│   ├── analyzers/                 (B) deterministic evidence → EvidenceBundle[]
+│   ├── analyzers/                 (Part 2) deterministic evidence → EvidenceBundle[]
 │   │   ├── index.ts               runAnalyzers(ctx), dispatch by stack
 │   │   ├── common/                jscpd, todo-grep, hardcoded-urls
 │   │   ├── ts/                    eslint, madge, npm-outdated, missing-tests
 │   │   ├── java/                  pmd, imports-graph, maven-deps, missing-tests, actuator
 │   │   └── config/                thresholds.yaml, eslint.config.mjs, pmd-ruleset.xml
 │   ├── integrations/              adapters to the outside world
-│   │   ├── llm/                   (A) circuit-token, circuit-client, agent-loop, usage
-│   │   ├── jira/                  (B) jira-cli, jira-rest, index.ts (JiraClient interface + in-memory fake)
-│   │   └── git/                   (B) worktree, churn
-│   ├── preflight/                 (B) checks, admin-request (print + copy), interactive prompt
-│   ├── profile/                   (B) Repo Profile (~/.techdebt/profiles/<repo>.yaml)
-│   └── report/                    (A) Scan Report md/json + cost
-├── prompts/                       (A) nano prompts as .md: classify, score-impact-risk, dossier-*, ticketer
-├── templates/                     (A) dossier/context.md, dossier/impact.md, jira/description.wiki
-├── skills/jira-autonomous/        (B) forked jira-issues, confirmation gate removed (pipeline only, never published)
-├── plugin/                        (B) published via ai-essentials
+│   │   ├── llm/                   (Part 1) circuit-token, circuit-client, agent-loop, usage
+│   │   ├── jira/                  (Part 2) jira-cli, jira-rest, index.ts (JiraClient interface + in-memory fake)
+│   │   └── git/                   (Part 2) worktree, churn
+│   ├── preflight/                 (Part 2) checks, admin-request (print + copy), interactive prompt
+│   ├── profile/                   (Part 2) Repo Profile (~/.techdebt/profiles/<repo>.yaml)
+│   └── report/                    (Part 1) Scan Report md/json + cost
+├── prompts/                       (Part 1) nano prompts as .md: classify, score-impact-risk, dossier-*, ticketer
+├── templates/                     (Part 1) dossier/context.md, dossier/impact.md, jira/description.wiki
+├── skills/jira-autonomous/        (Part 2) forked jira-issues, confirmation gate removed (pipeline only, never published)
+├── plugin/                        (Part 2) published via ai-essentials
 │   ├── .claude-plugin/plugin.json
 │   └── skills/                    techdebt-ask, techdebt-implement, techdebt-grill-implement
 ├── fixtures/                      evidence + debt-item + ticket JSON so both people can work offline from each other
@@ -195,9 +195,14 @@ For each gap, preflight **prints and copies to the clipboard** a ready-to-send a
 
 ## Team split and schedule (2 people)
 
-The split follows a seam that keeps the two people mostly independent: **Person A owns the pipeline brain** (everything that calls nano, plus the ranking logic). **Person B owns the edges**: everything that touches the scanned repo, Jira, or the developer.
+The split follows a seam that keeps the two people mostly independent: **Part 1 owns the pipeline brain** (everything that calls nano, plus the ranking logic). **Part 2 owns the edges**: everything that touches the scanned repo, Jira, or the developer.
 
-| | **Person A: Pipeline brain** | **Person B: Edges** |
+**Choosing who takes which part**
+
+- **Part 1: Pipeline brain.** Turns raw evidence into ranked, ticketed Debt Items. Builds the CircuIT client and the small agent loop, writes the nano prompts (classify, Impact/Risk scoring, Dossier), and wires the `scan` command, the ticketer and the Scan Report. Mostly TypeScript logic and prompt tuning; little shell or tooling. Suits someone who likes LLM work, data shaping and testing pure logic. Demos the live scan, the report and the 0-duplicates re-run.
+- **Part 2: Edges.** Everything that touches the outside world. Builds the git worktree checkout and churn, runs the static-analysis tools (ESLint, PMD, jscpd, madge, npm/maven) on TS and Java repos, writes the Jira client and the interactive permission preflight, forks the Jira skill, and writes the three developer skills (`ask`, `implement`, `grill-implement`). Lots of CLI tools, Jira and Java/TS tooling; less LLM work. Suits someone comfortable with Jira, Maven and shell tools. Demos the Jira Epic, `/techdebt-ask` and the PR from `/techdebt-implement`.
+
+| | **Part 1: Pipeline brain** | **Part 2: Edges** |
 |---|---|---|
 | Owns | `src/integrations/llm/circuit-client.ts`, `src/integrations/llm/agent-loop.ts`, `src/pipeline/stages/classify.ts`, `src/pipeline/stages/consolidate.ts`, `src/pipeline/stages/score.ts`, `src/domain/fingerprint.ts`, `src/domain/rubric.ts`, `src/domain/cut.ts`, `src/pipeline/stages/dossier.ts`, `src/report/`, `src/pipeline/stages/ticket.ts`, the `scan` command | `src/integrations/git/worktree.ts`, `src/analyzers/*`, `src/integrations/jira/*`, `src/integrations/git/churn.ts`, `src/preflight/`, `src/profile/`, the `setup` and `doctor` commands, `skills/jira-autonomous/`, `plugin/skills/*` |
 | Consumes from the other | `EvidenceBundle[]` (from analyzers), `src/integrations/jira/` client (for the ticketer) | `src/integrations/llm/circuit-client.ts` token fetch (for preflight), real tickets (to test the skills) |
@@ -205,23 +210,23 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 **Shared file:** only `src/domain/schemas.ts`, which both people write together in kickoff. After that, changes go through a quick ping. In `src/cli/` each person registers only their own commands.
 
-**Git:** short-lived branches `a/<topic>` and `b/<topic>`, merged to `main` at every ✅ sync point.
+**Git:** short-lived branches `p1/<topic>` and `p2/<topic>`, merged to `main` at every ✅ sync point.
 
 ### Kickoff (D1, first 45 min, together)
 1. Scaffold the repo (TS, commander, zod, eslint config) and push `main`.
 2. Write `src/domain/schemas.ts`: `EvidenceBundle`, `Finding`, `Defect`, `DebtItem`, `RubricScores`, `Dossier`, `RepoProfile`, `ScanContext`.
 3. Agree the two cross-person interfaces:
-   - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>` (B → A)
-   - `jira.search / create / update / comment / epicLink / attach / myPermissions` (B → A)
-4. B commits `fixtures/evidence-admin-mfe.json`, about 20 hand-written bundles across all 5 categories, so A can start immediately.
+   - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>` (Part 2 → Part 1)
+   - `jira.search / create / update / comment / epicLink / attach / myPermissions` (Part 2 → Part 1)
+4. Part 2 commits `fixtures/evidence-admin-mfe.json`, about 20 hand-written bundles across all 5 categories, so Part 1 can start immediately.
 
 ### Day 1: a ranked Cut from a dry run
 
-| Block (~2 h) | Person A | Person B |
+| Block (~2 h) | Part 1 | Part 2 |
 |---|---|---|
 | D1-1 | `src/integrations/llm/circuit-client.ts`: token cache, `api-key` header, `user` appkey, usage capture. **Probe whether nano accepts `json_schema`** and pick the structured-output strategy. `src/integrations/llm/agent-loop.ts` | `src/integrations/git/worktree.ts` (worktree of default branch, SHA), `scan.py` wiring, churn from `git log`. `src/integrations/jira/jira-cli.ts` + `src/integrations/jira/jira-rest.ts` (`myPermissions` first) |
 | D1-2 | `src/pipeline/stages/classify.ts` + `src/pipeline/stages/consolidate.ts` (Fingerprint), run against fixtures | TS analyzers on `admin-mfe`: ESLint, jscpd, madge, npm outdated, tests, ops. Replace the fixture with **real evidence JSON** |
-| ✅ Sync 1 | Merge. A runs classify on B's real `admin-mfe` evidence. | ← |
+| ✅ Sync 1 | Merge. Part 1 runs classify on Part 2's real `admin-mfe` evidence. | ← |
 | D1-3 | `src/domain/rubric.ts` + `src/pipeline/stages/score.ts` (Reach/Churn/Effort in code, Impact/Risk by nano), `src/domain/cut.ts`, `src/report/` + cost | Java analyzers on `feature-service`: PMD, jscpd, import graph, mvn/pom, tests, ops. `src/preflight/` + `techdebt doctor` |
 | ✅ Sync 2 (eve) | **Together:** `techdebt doctor`, then `techdebt scan --dry-run` on `admin-mfe`, then on `feature-service`. Fix what breaks. | ← |
 
@@ -229,17 +234,17 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 ### Day 2: tickets, skills, PR
 
-| Block (~2 h) | Person A | Person B |
+| Block (~2 h) | Part 1 | Part 2 |
 |---|---|---|
 | D2-1 | `src/pipeline/stages/dossier.ts`: `context.md` + `impact.md` templates, Zod heading checks | `src/profile/` + `techdebt setup` (runs preflight). Fork `jira-issues` → `skills/jira-autonomous/`. Create one hand-made test ticket. Start `techdebt-ask` against it |
 | D2-2 | `src/pipeline/stages/ticket.ts`: Epic find/create, JQL dedup, create Task, labels, priority, attachments (with fallbacks from preflight). **First live scan into `<JIRA-KEY>`** | Finish `techdebt-ask` (plan generation + `[techdebt-plan v1]` comment). `techdebt-implement` (drift check, branch, tests, PR, transition) |
-| ✅ Sync 3 | B runs `ask` and `implement` on A's **real** tickets. A re-runs the scan to prove **0 duplicates**. | ← |
+| ✅ Sync 3 | Part 2 runs `ask` and `implement` on Part 1's **real** tickets. Part 1 re-runs the scan to prove **0 duplicates**. | ← |
 | D2-3 | Tune analyzer noise from the live run, polish the Scan Report, **record a fallback scan** | `techdebt-grill-implement`. Produce the **real PR** for the chosen demo ticket |
 | D2-4 | **Together:** rehearse the demo twice. Freeze code 1 h before presenting. | ← |
 
 ### If one person falls behind
-- **A behind:** B takes `src/report/` (pure formatting from `DebtItem[]`).
-- **B behind:** A takes the Java Architecture analyzer or drops it (cut list #2). `grill-implement` is dropped first in all cases.
+- **Part 1 behind:** Part 2 takes `src/report/` (pure formatting from `DebtItem[]`).
+- **Part 2 behind:** Part 1 takes the Java Architecture analyzer or drops it (cut list #2). `grill-implement` is dropped first in all cases.
 
 ## Demo script (≈7 min)
 
@@ -285,6 +290,6 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 - [ ] `<JIRA-KEY>`: Jira project for the tickets
 - [ ] Generic Jira user provisioned; PAT configured as jira-cli instance `techdebt-bot` and in `TECHDEBT_JIRA_TOKEN`. `techdebt doctor` will report any missing permissions and print the admin request
-- [ ] Who is Person A and who is Person B
+- [ ] Who takes Part 1 and who takes Part 2
 - [ ] CircuIT creds exported locally
 - [ ] PMD and Maven available on the demo machine

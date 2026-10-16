@@ -36,5 +36,5 @@ export interface ChatResponse {
  * Header `api-key: <token>` (no Bearer). Body `user: JSON.stringify({ appkey })`. Never send `temperature`.
  */
 export async function chat(_req: ChatRequest, _usage: UsageMeter): Promise<ChatResponse> {
-  throw new Error("not implemented: chat (Person A, D1-1)");
+  throw new Error("not implemented: chat (Part 1, D1-1)");
 }

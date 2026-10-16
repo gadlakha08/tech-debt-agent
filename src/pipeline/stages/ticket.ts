@@ -16,5 +16,5 @@ export async function ticket(
   _jira: JiraClient,
   _usage: UsageMeter,
 ): Promise<DebtItem[]> {
-  throw new Error("not implemented: ticket (Person A, D2-2)");
+  throw new Error("not implemented: ticket (Part 1, D2-2)");
 }
