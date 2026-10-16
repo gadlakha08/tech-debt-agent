@@ -11,7 +11,7 @@ One end-to-end run of the agent against exactly one repository, from knowledge a
 _Avoid_: Job, audit, sweep
 
 **Agent Runtime**:
-The AI coding agent (Claude or Codex) that a whole Scan runs on, chosen once per Scan and recorded in the Scan Report.
+The model behind a Scan's agentic stages, recorded in the Scan Report. Developers' plugin skills run on their own model, not the Agent Runtime.
 _Avoid_: Provider, backend, model
 
 **Repo Profile**:

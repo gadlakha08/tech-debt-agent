@@ -279,8 +279,7 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 |---|---|---|
 | Debt Service + Postgres + private S3 (ADR-0001) | Jira + local `~/.techdebt/` files | 2 days; the expansion brings in a proper UI backend and Webex bot |
 | One MCP server with stage-scoped tokens (ADR-0003) | In-process tool functions; `run_jira_cli` allow-list | No external runtimes to share tools with yet |
-| Agent Runtime adapter over Agent SDKs (ADR-0002) | Own loop on CircuIT Chat Completions, gpt-5-nano | Only CircuIT is available to the pipeline |
-| Agent-written design options and implementation plan at scan time | Generated on first user-skill run, posted as a Jira comment | nano is too weak for design work; users bring strong models |
+| Agent-written design options and implementation plan at scan time | Generated on first user-skill run, posted as a Jira comment (ADR-0005) | nano is too weak for design work; users bring strong models |
 
 ## Open before kickoff
 
