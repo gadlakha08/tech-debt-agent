@@ -1,0 +1,15 @@
+{
+  "name": "tech-debt-agent",
+  "version": "0.1.0",
+  "description": "Ask about, plan, and implement tech-debt tickets created by the tech-debt agent. Works in Claude Code and Codex.",
+  "author": { "name": "gadlakha08", "url": "https://github.com/gadlakha08" },
+  "homepage": "https://github.com/gadlakha08/tech-debt-agent",
+  "repository": "https://github.com/gadlakha08/tech-debt-agent",
+  "license": "UNLICENSED",
+  "keywords": ["tech-debt", "jira", "refactoring"],
+  "skills": [
+    "./skills/techdebt-ask",
+    "./skills/techdebt-implement",
+    "./skills/techdebt-grill-implement"
+  ]
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "category": "code",
+    "rule": "complexity",
+    "symbolPath": "src/app/users/user-table.component#buildRows",
+    "files": ["src/app/users/user-table.component.ts"],
+    "metrics": { "value": 17, "threshold": 10, "loc": 84, "fanIn": 3 },
+    "snippet": "user-table.component.ts\n  buildRows  complexity 17 (max 10)",
+    "stack": "ts"
+  }
+]

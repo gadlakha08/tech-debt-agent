@@ -1,0 +1,20 @@
+# Single place to tune analyzer noise (Person B). Bundles below threshold are never emitted.
+code:
+  complexity: 10
+  maxDepth: 3
+  maxLinesPerFunction: 50
+  maxLinesPerFile: 500
+  duplicationMinTokens: 50
+  todoMinPerFile: 1
+architecture:
+  reportCircular: true
+dependencies:
+  majorsBehind: 1
+  flagDeprecated: true
+testing:
+  requireTestFile: true
+ops:
+  hardcodedUrls: true
+  requireActuator: [health, metrics]
+churn:
+  sinceDays: 180

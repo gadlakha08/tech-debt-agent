@@ -1,0 +1,37 @@
+{
+  "name": "tech-debt-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scans one repo for tech debt, ranks it with a Rubric, and tickets the Cut in Jira with a Dossier.",
+  "type": "module",
+  "bin": {
+    "techdebt": "dist/cli/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "clipboardy": "^5.3.2",
+    "commander": "^15.0.0",
+    "eslint": "^10.12.0",
+    "execa": "^10.1.1",
+    "jscpd": "^5.4.1",
+    "madge": "^8.0.0",
+    "p-limit": "^7.3.3",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

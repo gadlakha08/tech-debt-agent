@@ -42,45 +42,56 @@ User side (their own model):
 
 ## Repo layout
 
-Single TypeScript package for speed. Split it into a monorepo after the hackathon.
+Single TypeScript package for speed, layered so the two people rarely touch the same folder. Conventions are in [`AGENTS.md`](../../AGENTS.md).
 
 ```
 tech-debt-agent/
-├── CONTEXT.md
+├── CONTEXT.md  AGENTS.md  README.md
+├── package.json  tsconfig.json  .env.example
 ├── docs/adr/  docs/plan/
 ├── src/
-│   ├── cli.ts                 commander: scan, setup, doctor
-│   ├── preflight.ts           permission + environment checks, admin-request message
-│   ├── profile.ts             Repo Profile (~/.techdebt/profiles/<repo>.yaml)
-│   ├── checkout.ts            git worktree of default branch, SHA
-│   ├── llm/
-│   │   ├── circuit.ts         token cache, api-key header, user appkey, usage capture
-│   │   └── loop.ts            minimal tool-calling agent loop (max steps, Zod output)
-│   ├── analyzers/             one file per Debt Category, per stack (ts | java)
-│   ├── classify.ts            nano: evidence → Finding | Defect | discard
-│   ├── consolidate.ts         Fingerprint + grouping
-│   ├── rubric.ts              scores, Severity bands
-│   ├── cut.ts
-│   ├── dossier.ts             context.md + impact.md
-│   ├── jira/
-│   │   ├── cli.ts             jira-cli runner (--instance techdebt-bot, subcommand allow-list)
-│   │   └── rest.ts            mypermissions, attachment upload
-│   ├── ticketer.ts            agent loop + jira-autonomous skill + jira/ client
-│   ├── report.ts              Scan Report + cost
-│   └── schemas.ts             Zod: EvidenceBundle, Finding, DebtItem, Dossier
-├── fixtures/                evidence + debt-item JSON so both people can work offline from each other
-├── skills/jira-autonomous/    forked jira-issues, confirmation gate removed (pipeline only)
-└── plugin/skills/             published via ai-essentials
-    ├── techdebt-ask/
-    ├── techdebt-implement/
-    └── techdebt-grill-implement/
+│   ├── cli/                       (shared) commander entry; each person registers only their own commands
+│   │   ├── index.ts
+│   │   └── commands/              scan.ts (A), setup.ts (B), doctor.ts (B)
+│   ├── domain/                    (shared, pure: no I/O) Zod schemas + ranking math
+│   │   ├── schemas.ts             EvidenceBundle, Finding, Defect, DebtItem, RubricScores, Dossier, RepoProfile, ScanContext
+│   │   ├── fingerprint.ts         sha1(category|rule|symbolPath).slice(0,10)
+│   │   ├── rubric.ts              Reach / Churn / Effort, Severity bands
+│   │   └── cut.ts                 High + Medium, floor 10, cap 15
+│   ├── pipeline/                  (A) stage orchestration
+│   │   ├── run-scan.ts            stages 0–10
+│   │   └── stages/                classify, consolidate, score (nano Impact/Risk), dossier, ticket
+│   ├── analyzers/                 (B) deterministic evidence → EvidenceBundle[]
+│   │   ├── index.ts               runAnalyzers(ctx), dispatch by stack
+│   │   ├── common/                jscpd, todo-grep, hardcoded-urls
+│   │   ├── ts/                    eslint, madge, npm-outdated, missing-tests
+│   │   ├── java/                  pmd, imports-graph, maven-deps, missing-tests, actuator
+│   │   └── config/                thresholds.yaml, eslint.config.mjs, pmd-ruleset.xml
+│   ├── integrations/              adapters to the outside world
+│   │   ├── llm/                   (A) circuit-token, circuit-client, agent-loop, usage
+│   │   ├── jira/                  (B) jira-cli, jira-rest, index.ts (JiraClient interface + in-memory fake)
+│   │   └── git/                   (B) worktree, churn
+│   ├── preflight/                 (B) checks, admin-request (print + copy), interactive prompt
+│   ├── profile/                   (B) Repo Profile (~/.techdebt/profiles/<repo>.yaml)
+│   └── report/                    (A) Scan Report md/json + cost
+├── prompts/                       (A) nano prompts as .md: classify, score-impact-risk, dossier-*, ticketer
+├── templates/                     (A) dossier/context.md, dossier/impact.md, jira/description.wiki
+├── skills/jira-autonomous/        (B) forked jira-issues, confirmation gate removed (pipeline only, never published)
+├── plugin/                        (B) published via ai-essentials
+│   ├── .claude-plugin/plugin.json
+│   └── skills/                    techdebt-ask, techdebt-implement, techdebt-grill-implement
+├── fixtures/                      evidence + debt-item + ticket JSON so both people can work offline from each other
+├── test/                          Vitest: domain/ (pure), analyzers/ (against samples)
+└── scripts/                       probe-circuit.ts, fake-ticket.ts
 ```
 
-Deps: `commander`, `zod`, `zod-to-json-schema`, `openai`, `execa`, `p-limit`, `yaml`, `jscpd`, `madge`, `eslint`, `clipboardy`.
+**Dependency rule:** `domain` imports nothing. `integrations`, `analyzers`, `preflight`, `profile` import only `domain`. `pipeline` and `report` import those. `cli` imports `pipeline`, `preflight`, `profile`.
+
+Deps: `commander`, `zod` (v4, built-in JSON Schema), `execa`, `p-limit`, `yaml`, `clipboardy`, `jscpd`, `madge`, `eslint`. Dev: `typescript`, `tsx`, `vitest`. The CircuIT client uses plain `fetch` (custom `api-key` header + appkey in the body), so no `openai` SDK.
 
 ## Component specs
 
-### CircuIT client (`llm/circuit.ts`)
+### CircuIT client (`src/integrations/llm/circuit-client.ts`)
 - OAuth client-credentials POST to `id.cisco.com` token URL. Cache the token and refresh it 120 s before expiry (same pattern as `CircuitTokenService` in `cspe-sc-self-service`).
 - `POST https://chat-ai.cisco.com/openai/deployments/gpt-5-nano/chat/completions`, with header `api-key: <token>` and body `user: {"appkey": ...}`.
 - Env: `CIRCUIT_LLM_CLIENT_ID`, `CIRCUIT_LLM_CLIENT_SECRET`, `CIRCUIT_LLM_APP_KEY`, `CIRCUIT_LLM_TOKEN_URL`, `CIRCUIT_LLM_CHAT_URL`, `CIRCUIT_LLM_DEPLOYMENT`.
@@ -88,10 +99,10 @@ Deps: `commander`, `zod`, `zod-to-json-schema`, `openai`, `execa`, `p-limit`, `y
 - Prefer `response_format: json_schema`. If the gateway rejects it, fall back to a single forced tool call whose parameters are the schema.
 - Record `usage.prompt_tokens` and `usage.completion_tokens` per call, tagged by stage, for the Scan Report.
 
-### Agent loop (`llm/loop.ts`)
+### Agent loop (`src/integrations/llm/agent-loop.ts`)
 Plain chat-completions tool loop: max 8 steps, Zod-validated final output, one retry when validation fails. Tools are in-process functions: `read_file`, `grep`, `list_files`, `run_jira_cli` (ticketer only, with an allow-list of subcommands).
 
-### Analyzers (`analyzers/`)
+### Analyzers (`src/analyzers/`)
 Each analyzer emits `EvidenceBundle { category, rule, symbolPath, files[], metrics, snippet }`.
 
 | Category | TS (`admin-mfe`) | Java (`feature-service`) |
@@ -104,30 +115,30 @@ Each analyzer emits `EvidenceBundle { category, rule, symbolPath, files[], metri
 
 Churn input for every category: `git log --since=180.days --name-only` → commits per file.
 
-### Classify (`classify.ts`)
+### Classify (`src/pipeline/stages/classify.ts`)
 Nano gets one bundle at a time (snippet capped at around 150 lines) plus the `scan.py` stack summary. It returns `Finding { title, description, evidence[] }` or `Defect { kind, description }` or `discard { reason }`. Run 8 in parallel with `p-limit`.
 
-### Fingerprint and consolidation
+### Fingerprint and consolidation (`src/domain/fingerprint.ts`, `src/pipeline/stages/consolidate.ts`)
 `fingerprint = sha1(category | rule | normalisedSymbolPath).slice(0, 10)`. The symbol path uses package/module plus class/function, **never line numbers**. Findings that share a Fingerprint merge into one Debt Item.
 
-### Rubric (`rubric.ts`)
+### Rubric (`src/domain/rubric.ts`, `src/pipeline/stages/score.ts`)
 Each dimension scores 1–5. Severity = Impact + Reach + Churn + Risk (4–20): **High ≥ 15, Medium ≥ 9, otherwise Low.**
 - **Reach** (code): fan-in percentile across the repo → 1–5.
 - **Churn** (code): commit-count percentile of the affected files → 1–5.
 - **Effort** (code, tie-break only): affected LOC <50 → S, <300 → M, <1000 → L, otherwise XL.
 - **Impact, Risk** (nano): pick 1–5 from anchored descriptions and give a one-line justification that cites the evidence.
 
-### Cut (`cut.ts`)
+### Cut (`src/domain/cut.ts`)
 Sort by Severity, then score, then smaller Effort first. Take all High and Medium. If that gives fewer than 10, fill up to 10 from Low. Cap at 15 unless `--uncap` or `--max N` is passed. Everything else goes into the Scan Report only.
 
-### Lite Dossier (`dossier.ts`)
+### Lite Dossier (`src/pipeline/stages/dossier.ts`)
 Nano fills fixed templates, validated by Zod for required headings.
 - **`context.md`**: What, Where (files, symbols), Evidence (tool output), Why it is debt, Scanned Commit.
 - **`impact.md`**: Rubric scores with justifications, Severity, Effort, who and what is affected, risk of leaving it.
 
 Copies are kept in `~/.techdebt/runs/<repo>/<ts>/<fingerprint>/`.
 
-### Ticketer (`ticketer.ts`)
+### Ticketer (`src/pipeline/stages/ticket.ts`)
 1. Ensure the Epic `<repo>-tech-debts` exists. Find it by JQL (`issuetype = Epic AND summary ~ "<repo>-tech-debts"`), otherwise create it. All jira-cli calls use `--instance techdebt-bot`.
 2. Per Debt Item, the nano agent loop gets the forked `jira-autonomous` skill text and the `run_jira_cli` tool. **It must JQL-search `labels = td-fp-<fp>` first.** If a ticket exists, it comments instead of creating. Otherwise it creates a **Task** with:
    - Priority: High → Major, Medium → Minor, Low → Trivial
@@ -137,7 +148,7 @@ Copies are kept in `~/.techdebt/runs/<repo>/<ts>/<fingerprint>/`.
 3. Code (not the agent) uploads `context.md` and `impact.md` via `POST /rest/api/2/issue/{key}/attachments` (`X-Atlassian-Token: no-check`).
 4. Write the ticket key into the Scan Report.
 
-### Scan Report (`report.ts`)
+### Scan Report (`src/report/`)
 `report.md` + `report.json` contain:
 - the Cut with ticket keys
 - items below the Cut with scores
@@ -145,10 +156,10 @@ Copies are kept in `~/.techdebt/runs/<repo>/<ts>/<fingerprint>/`.
 - Scanned Commit
 - tokens and cost per stage, using the price per 1M tokens set in the profile
 
-### Repo Profile (`profile.ts`)
+### Repo Profile (`src/profile/`)
 `techdebt setup <repo>` asks interactively for the Jira project, Epic name (default: `<repo>-tech-debts`), issue type, and the Defect default, then saves them to YAML. Later scans read the YAML and run with no questions.
 
-### Preflight (`preflight.ts`, `techdebt doctor`)
+### Preflight (`src/preflight/`, `techdebt doctor`)
 Runs inside `setup`, at the start of every `scan`, and on its own as `techdebt doctor`. It finishes before any nano call is made.
 
 **Environment checks:** CircuIT token fetch succeeds; jira-cli instance `techdebt-bot` passes `whoami`; `git`, `jscpd`, `madge` are available; PMD and `mvn` are available for Java repos; the default branch can be checked out.
@@ -165,7 +176,7 @@ Runs inside `setup`, at the start of every `scan`, and on its own as `techdebt d
 For each gap, preflight **prints and copies to the clipboard** a ready-to-send admin request, e.g. *"Please add user techdebt-bot to the Developers role in project CSPE (needs: Create Attachments)."* It never sends the request itself.
 
 - **Interactive:** `[r]` re-check after the admin grants it, `[i]` use the fallback, `[q]` quit. Blocking gaps offer only `[r]` and `[q]`.
-- **Headless:** never waits. A blocking gap fails the run; fallbacks are applied automatically and noted in the Scan Report.
+- **Headless mode:** post-hackathon (for CI). The hackathon build is interactive only.
 
 ### Plugin skills (`plugin/skills/`)
 - **`techdebt-ask`**:
@@ -188,17 +199,17 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 | | **Person A: Pipeline brain** | **Person B: Edges** |
 |---|---|---|
-| Owns | `llm/circuit.ts`, `llm/loop.ts`, `classify.ts`, `consolidate.ts`, `rubric.ts`, `cut.ts`, `dossier.ts`, `report.ts`, `ticketer.ts`, the `scan` command | `checkout.ts`, `analyzers/*`, `jira/*`, `preflight.ts`, `profile.ts`, the `setup` and `doctor` commands, `skills/jira-autonomous/`, `plugin/skills/*` |
-| Consumes from the other | `EvidenceBundle[]` (from analyzers), `jira/` client (for the ticketer) | `circuit.ts` token fetch (for preflight), real tickets (to test the skills) |
+| Owns | `src/integrations/llm/circuit-client.ts`, `src/integrations/llm/agent-loop.ts`, `src/pipeline/stages/classify.ts`, `src/pipeline/stages/consolidate.ts`, `src/pipeline/stages/score.ts`, `src/domain/fingerprint.ts`, `src/domain/rubric.ts`, `src/domain/cut.ts`, `src/pipeline/stages/dossier.ts`, `src/report/`, `src/pipeline/stages/ticket.ts`, the `scan` command | `src/integrations/git/worktree.ts`, `src/analyzers/*`, `src/integrations/jira/*`, `src/integrations/git/churn.ts`, `src/preflight/`, `src/profile/`, the `setup` and `doctor` commands, `skills/jira-autonomous/`, `plugin/skills/*` |
+| Consumes from the other | `EvidenceBundle[]` (from analyzers), `src/integrations/jira/` client (for the ticketer) | `src/integrations/llm/circuit-client.ts` token fetch (for preflight), real tickets (to test the skills) |
 | Works offline against | `fixtures/evidence-*.json` until real analyzers land | A hand-made ticket in `<JIRA-KEY>` until the ticketer lands |
 
-**Shared file:** only `schemas.ts`, which both people write together in kickoff. After that, changes go through a quick ping. In `cli.ts` each person registers only their own commands.
+**Shared file:** only `src/domain/schemas.ts`, which both people write together in kickoff. After that, changes go through a quick ping. In `src/cli/` each person registers only their own commands.
 
 **Git:** short-lived branches `a/<topic>` and `b/<topic>`, merged to `main` at every ✅ sync point.
 
 ### Kickoff (D1, first 45 min, together)
 1. Scaffold the repo (TS, commander, zod, eslint config) and push `main`.
-2. Write `schemas.ts`: `EvidenceBundle`, `Finding`, `Defect`, `DebtItem`, `RubricScores`, `Dossier`, `RepoProfile`, `ScanContext`.
+2. Write `src/domain/schemas.ts`: `EvidenceBundle`, `Finding`, `Defect`, `DebtItem`, `RubricScores`, `Dossier`, `RepoProfile`, `ScanContext`.
 3. Agree the two cross-person interfaces:
    - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>` (B → A)
    - `jira.search / create / update / comment / epicLink / attach / myPermissions` (B → A)
@@ -208,10 +219,10 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 | Block (~2 h) | Person A | Person B |
 |---|---|---|
-| D1-1 | `circuit.ts`: token cache, `api-key` header, `user` appkey, usage capture. **Probe whether nano accepts `json_schema`** and pick the structured-output strategy. `loop.ts` | `checkout.ts` (worktree of default branch, SHA), `scan.py` wiring, churn from `git log`. `jira/cli.ts` + `jira/rest.ts` (`myPermissions` first) |
-| D1-2 | `classify.ts` + `consolidate.ts` (Fingerprint), run against fixtures | TS analyzers on `admin-mfe`: ESLint, jscpd, madge, npm outdated, tests, ops. Replace the fixture with **real evidence JSON** |
+| D1-1 | `src/integrations/llm/circuit-client.ts`: token cache, `api-key` header, `user` appkey, usage capture. **Probe whether nano accepts `json_schema`** and pick the structured-output strategy. `src/integrations/llm/agent-loop.ts` | `src/integrations/git/worktree.ts` (worktree of default branch, SHA), `scan.py` wiring, churn from `git log`. `src/integrations/jira/jira-cli.ts` + `src/integrations/jira/jira-rest.ts` (`myPermissions` first) |
+| D1-2 | `src/pipeline/stages/classify.ts` + `src/pipeline/stages/consolidate.ts` (Fingerprint), run against fixtures | TS analyzers on `admin-mfe`: ESLint, jscpd, madge, npm outdated, tests, ops. Replace the fixture with **real evidence JSON** |
 | ✅ Sync 1 | Merge. A runs classify on B's real `admin-mfe` evidence. | ← |
-| D1-3 | `rubric.ts` (Reach/Churn/Effort in code, Impact/Risk by nano), `cut.ts`, `report.ts` + cost | Java analyzers on `feature-service`: PMD, jscpd, import graph, mvn/pom, tests, ops. `preflight.ts` + `techdebt doctor` |
+| D1-3 | `src/domain/rubric.ts` + `src/pipeline/stages/score.ts` (Reach/Churn/Effort in code, Impact/Risk by nano), `src/domain/cut.ts`, `src/report/` + cost | Java analyzers on `feature-service`: PMD, jscpd, import graph, mvn/pom, tests, ops. `src/preflight/` + `techdebt doctor` |
 | ✅ Sync 2 (eve) | **Together:** `techdebt doctor`, then `techdebt scan --dry-run` on `admin-mfe`, then on `feature-service`. Fix what breaks. | ← |
 
 **Day 1 exit:** `techdebt scan --dry-run <feature-service>` prints a ranked Cut of 10–15 Debt Items with evidence, scores and token cost, and `techdebt doctor` reports Jira permission status.
@@ -220,14 +231,14 @@ The split follows a seam that keeps the two people mostly independent: **Person 
 
 | Block (~2 h) | Person A | Person B |
 |---|---|---|
-| D2-1 | `dossier.ts`: `context.md` + `impact.md` templates, Zod heading checks | `profile.ts` + `techdebt setup` (runs preflight). Fork `jira-issues` → `skills/jira-autonomous/`. Create one hand-made test ticket. Start `techdebt-ask` against it |
-| D2-2 | `ticketer.ts`: Epic find/create, JQL dedup, create Task, labels, priority, attachments (with fallbacks from preflight). **First live scan into `<JIRA-KEY>`** | Finish `techdebt-ask` (plan generation + `[techdebt-plan v1]` comment). `techdebt-implement` (drift check, branch, tests, PR, transition) |
+| D2-1 | `src/pipeline/stages/dossier.ts`: `context.md` + `impact.md` templates, Zod heading checks | `src/profile/` + `techdebt setup` (runs preflight). Fork `jira-issues` → `skills/jira-autonomous/`. Create one hand-made test ticket. Start `techdebt-ask` against it |
+| D2-2 | `src/pipeline/stages/ticket.ts`: Epic find/create, JQL dedup, create Task, labels, priority, attachments (with fallbacks from preflight). **First live scan into `<JIRA-KEY>`** | Finish `techdebt-ask` (plan generation + `[techdebt-plan v1]` comment). `techdebt-implement` (drift check, branch, tests, PR, transition) |
 | ✅ Sync 3 | B runs `ask` and `implement` on A's **real** tickets. A re-runs the scan to prove **0 duplicates**. | ← |
 | D2-3 | Tune analyzer noise from the live run, polish the Scan Report, **record a fallback scan** | `techdebt-grill-implement`. Produce the **real PR** for the chosen demo ticket |
 | D2-4 | **Together:** rehearse the demo twice. Freeze code 1 h before presenting. | ← |
 
 ### If one person falls behind
-- **A behind:** B takes `report.ts` (pure formatting from `DebtItem[]`).
+- **A behind:** B takes `src/report/` (pure formatting from `DebtItem[]`).
 - **B behind:** A takes the Java Architecture analyzer or drops it (cut list #2). `grill-implement` is dropped first in all cases.
 
 ## Demo script (≈7 min)

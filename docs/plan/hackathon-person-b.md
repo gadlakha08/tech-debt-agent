@@ -8,13 +8,13 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 
 | File | What it does |
 |---|---|
-| `src/checkout.ts` | Clean worktree of `origin/main` or `origin/master`, Scanned Commit SHA, churn from `git log` |
-| `src/analyzers/*` | Deterministic evidence per Debt Category, for TS and Java |
-| `src/jira/cli.ts` | jira-cli runner (`--instance techdebt-bot`, subcommand allow-list) |
-| `src/jira/rest.ts` | `mypermissions`, attachment upload (`TECHDEBT_JIRA_TOKEN`) |
-| `src/preflight.ts` | Environment + Jira permission checks; prints and copies the admin request |
-| `src/profile.ts` | Repo Profile YAML in `~/.techdebt/profiles/<repo>.yaml` |
-| `setup` and `doctor` commands in `src/cli.ts` | Interactive setup; standalone preflight |
+| `src/integrations/git/worktree.ts`, `churn.ts` | Clean worktree of `origin/main` or `origin/master`, Scanned Commit SHA, churn from `git log` |
+| `src/analyzers/*` | Deterministic evidence per Debt Category, for TS and Java; thresholds in `src/analyzers/config/thresholds.yaml` |
+| `src/integrations/jira/jira-cli.ts` | jira-cli runner (`--instance techdebt-bot`, subcommand allow-list) |
+| `src/integrations/jira/jira-rest.ts` | `mypermissions`, attachment upload (`TECHDEBT_JIRA_TOKEN`) |
+| `src/preflight/` | Environment + Jira permission checks; prints and copies the admin request |
+| `src/profile/` | Repo Profile YAML in `~/.techdebt/profiles/<repo>.yaml` |
+| `src/cli/commands/setup.ts`, `src/cli/commands/doctor.ts` | Interactive setup; standalone preflight |
 | `skills/jira-autonomous/` | Fork of `jira-issues` with the confirmation gate removed (pipeline only) |
 | `plugin/skills/techdebt-ask/` | Q&A on a ticket; generates the plan if it's missing |
 | `plugin/skills/techdebt-implement/` | Drift check → branch → code → tests → PR → Jira transition |
@@ -27,7 +27,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - `fixtures/evidence-admin-mfe.json`, about 20 bundles across all 5 categories. **Push at kickoff.**
 - `runAnalyzers(ctx: ScanContext): Promise<EvidenceBundle[]>`. **Real TS output by Sync 1, Java by Sync 2.**
 - `checkout(repoPath): Promise<{ worktree, sha, defaultBranch }>` and `churn(ctx): Promise<Record<file, commitCount>>`, **by end of D1-1**
-- `jira.search / create / update / comment / epicLink / attach` from `src/jira/`, **by end of D1-3**
+- `jira.search / create / update / comment / epicLink / attach` from `src/integrations/jira/`, **by end of D1-3**
 - `preflight(profile, { interactive }): Promise<{ ok, fallbacks: { noAttach, noEpicLink, noComments } }>`, **by Sync 2**
 - `skills/jira-autonomous/SKILL.md`, **by end of D2-1**
 
@@ -35,7 +35,7 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 - `getCircuitToken()` for the CircuIT check in preflight (end of D1-1)
 - Real tickets for testing the skills (Sync 3). Until then, test on one hand-made ticket.
 
-**Shared:** `src/schemas.ts`, written together at kickoff. Ping before changing it.
+**Shared:** `src/domain/schemas.ts`, written together at kickoff. Ping before changing it.
 
 ### `EvidenceBundle` shape (what your analyzers must produce)
 ```ts
@@ -51,21 +51,21 @@ Full component specs are in [`hackathon-plan.md`](hackathon-plan.md); vocabulary
 ---
 
 ## Kickoff (D1, first 45 min, with A)
-- [ ] Scaffold together and write `schemas.ts`; agree the interface stubs
+- [ ] Scaffold together and write `src/domain/schemas.ts`; agree the interface stubs
 - [ ] **Push `fixtures/evidence-admin-mfe.json`** with about 20 realistic bundles covering all 5 categories, so A is unblocked
 
 ## Day 1
 
 ### D1-1: Checkout + Jira client (~2 h)
-- [ ] `checkout.ts`:
+- [ ] `src/integrations/git/worktree.ts`:
   - [ ] Detect the default branch from `git symbolic-ref refs/remotes/origin/HEAD`, falling back to `main`, then `master`
   - [ ] Create a temp worktree, `git worktree add <tmp> origin/<branch>`, and record the SHA. Remove the worktree when the scan ends.
-  - [ ] `churn()`: `git log --since=180.days --name-only --pretty=format:` → commits per file
+  - [ ] `churn()` in `src/integrations/git/churn.ts`: `git log --since=180.days --name-only --pretty=format:` → commits per file
   - [ ] Run `python3 ~/.agents/skills/acquire-codebase-knowledge/scripts/scan.py --output <tmp>/scan.txt` **inside the worktree** and put a stack summary into `ScanContext`
   - [ ] Push `checkout` + `churn` for A
-- [ ] `jira/cli.ts`:
+- [ ] `src/integrations/jira/jira-cli.ts`:
   - [ ] Wrap `jira-cli --instance techdebt-bot --format json <cmd>` with an allow-list: `search`, `create`, `update`, `comment`, `epics link`, `whoami`
-- [ ] `jira/rest.ts`:
+- [ ] `src/integrations/jira/jira-rest.ts`:
   - [ ] `myPermissions(projectKey)`: `GET /rest/api/2/mypermissions?projectKey=…&permissions=BROWSE_PROJECTS,CREATE_ISSUES,ADD_COMMENTS,EDIT_ISSUES,CREATE_ATTACHMENTS`
   - [ ] `attach(key, filePath)`: `POST /rest/api/2/issue/{key}/attachments` with `X-Atlassian-Token: no-check`
 - **Done when:** `checkout` returns a SHA for `admin-mfe` and `myPermissions` returns real flags for `<JIRA-KEY>`.
@@ -96,7 +96,7 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
   - [ ] **dependencies**: `mvn -q versions:display-dependency-updates`. **Fallback:** parse `pom.xml` and compare against a small known-EOL list (e.g. Spring Boot 2.x, Java 8/11)
   - [ ] **testing**: `src/main` classes with no `*Test` in `src/test`; parse JaCoCo XML if present
   - [ ] **ops**: hardcoded URLs; missing actuator `health`/`metrics` config
-- [ ] `preflight.ts`:
+- [ ] `src/preflight/`:
   - [ ] **Environment**: CircuIT token works (`getCircuitToken()`); `jira-cli --instance techdebt-bot whoami`; `git`, `jscpd` and `madge` installed, plus `pmd` and `mvn` for Java; default branch can be checked out
   - [ ] **Jira**: run `myPermissions` and map each gap to block or fallback:
 
@@ -107,9 +107,9 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
     | `EDIT_ISSUES` | `noEpicLink` |
     | `CREATE_ATTACHMENTS` | `noAttach` |
   - [ ] For each gap, **print and copy (`clipboardy`)** the admin request: *"Please add user techdebt-bot to the Developers role in project `<KEY>` (needs: …)."* It never sends the request itself.
-  - [ ] **Interactive**: `[r]` re-check / `[i]` use the fallback / `[q]` quit. Blocking gaps offer only `[r]` and `[q]`. **Headless**: never wait.
+  - [ ] **Interactive**: `[r]` re-check / `[i]` use the fallback / `[q]` quit. Blocking gaps offer only `[r]` and `[q]`. Interactive only for the hackathon; headless mode is post-hackathon.
   - [ ] Add the `techdebt doctor` command
-- [ ] Push the `jira/` client for A
+- [ ] Push the `src/integrations/jira/` client for A
 
 ### ✅ Sync 2: evening (~1–2 h, together)
 - [ ] `techdebt doctor`, then `techdebt scan --dry-run` on `admin-mfe`, then on `feature-service`
@@ -120,7 +120,7 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
 ## Day 2
 
 ### D2-1: Setup, forked Jira skill, start `ask` (~2 h)
-- [ ] `profile.ts` + `techdebt setup <repo>`:
+- [ ] `src/profile/` + `techdebt setup <repo>`:
   - [ ] Asks for the Jira project key, Epic name (default `<repo>-tech-debts`), issue type (default Task), Defect default, and price per 1M tokens
   - [ ] Runs preflight, then saves the YAML
 - [ ] **Fork `~/.agents/skills/jira-issues` → `skills/jira-autonomous/`**:
@@ -131,7 +131,7 @@ Run each analyzer in the worktree. Each one emits `EvidenceBundle[]`.
     - "always use `--instance techdebt-bot`"
     - "always JQL-search `labels = td-fp-<fp>` before creating"
   - [ ] Push it for A
-- [ ] Create **one hand-made test ticket** in `<JIRA-KEY>`, shaped like A's: labels, description, and attached `context.md` / `impact.md`
+- [ ] Create **one hand-made test ticket** (`scripts/fake-ticket.ts`) in `<JIRA-KEY>`, shaped like A's: labels, description, and attached `context.md` / `impact.md`
 - [ ] Start `plugin/skills/techdebt-ask/SKILL.md` against that ticket
 
 ### D2-2: `ask` + `implement` skills (~2 h)
