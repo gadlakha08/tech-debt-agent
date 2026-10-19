@@ -1,4 +1,4 @@
-# Tech Debt Agent
+# DebtDoctor
 
 Discovers technical debt in a single repository, ranks it, and turns the most important items into Jira tickets backed by a Dossier that developers can question and implement from.
 
@@ -49,11 +49,11 @@ _Avoid_: Security debt, bug debt
 ### Ranking
 
 **Rubric**:
-The written scoring criteria (Impact, Reach, Churn, Risk scored 1–5, plus Effort) applied to every Debt Item.
+The written scoring criteria (Impact, Reach, Churn, Risk scored 1–5) applied to every Debt Item.
 _Avoid_: Scoring model, heuristics
 
 **Severity**:
-The High / Medium / Low band a Debt Item falls into from its Rubric score; Effort never affects it.
+The High / Medium / Low band a Debt Item falls into from its Rubric score.
 _Avoid_: Priority (that is a Jira field), criticality
 
 **Cut**:

@@ -1,6 +1,6 @@
 # Deterministic evidence, nano judgement, and a split Dossier
 
-Because the pipeline only has gpt-5-nano, the model never searches the codebase for debt. Deterministic analyzers (ESLint, PMD, jscpd, madge, dependency and test checks) produce small Evidence Bundles; nano only classifies each one (Finding, Defect or discard) and picks Impact and Risk from anchored 1–5 descriptions. Reach, Churn and Effort are computed in code.
+Because the pipeline only has gpt-5-nano, the model never searches the codebase for debt. Deterministic analyzers (ESLint, PMD, jscpd, madge, dependency and test checks) produce small Evidence Bundles; nano only classifies each one (Finding, Defect or discard) and picks Impact and Risk from anchored 1–5 descriptions. Reach and Churn are computed in code.
 
 The Dossier is split by who can write it well. At scan time nano writes only the Lite Dossier (`context.md`, `impact.md`) from fixed templates with required headings. Design options and the implementation plan are written by the first plugin skill run on the developer's own stronger model, and recorded on the Ticket as a `[techdebt-plan vN]` comment. Later Amendments add new versions.
 
