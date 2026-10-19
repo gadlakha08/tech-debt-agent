@@ -1,0 +1,16 @@
+<!-- Jira wiki markup for a Ticket's description; filled in code by stages/ticket.ts, no model call. -->
+h2. Summary
+{{summary}}
+
+h2. Severity
+*{{severity}}* (Impact {{impact}}, Reach {{reach}}, Churn {{churn}}, Risk {{risk}})
+
+h2. Evidence
+{{evidence}}
+
+h2. Fingerprint and scan
+Fingerprint: {{fingerprint}}
+Scanned commit: {{sha}}
+
+Run /techdebt-ask <KEY> to explore this ticket.
+{{dossier}}

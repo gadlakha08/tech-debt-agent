@@ -1,1 +1,13 @@
-<!-- Part 1, D2-1. Fills templates/dossier/context.md. Keep every heading; do not add new ones. -->
+<!-- Skeleton for context.md. Every "## " heading is required; stages/dossier.ts checks for them. -->
+# {{title}}
+
+## What
+
+## Where
+
+## Evidence
+
+## Why it is debt
+
+## Scanned Commit
+`{{sha}}` on `{{defaultBranch}}`
