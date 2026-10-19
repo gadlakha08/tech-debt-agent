@@ -1,5 +1,5 @@
 {
-  "name": "tech-debt-agent",
+  "name": "debtdoctor",
   "version": "0.1.0",
   "description": "Ask about, plan, and implement tech-debt tickets created by the tech-debt agent. Works in Claude Code and Codex.",
   "author": { "name": "gadlakha08", "url": "https://github.com/gadlakha08" },
