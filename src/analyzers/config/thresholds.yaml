@@ -1,20 +1,24 @@
 # Single place to tune analyzer noise (Part 2). Bundles below threshold are never emitted.
+# The PMD ruleset and the ESLint rules are generated from these numbers; there are no other config files.
 code:
-  complexity: 10
-  maxDepth: 3
-  maxLinesPerFunction: 50
-  maxLinesPerFile: 500
-  duplicationMinTokens: 50
+  complexity: 10 # cyclomatic, per method/function
+  maxDepth: 3 # TS only (ESLint max-depth)
+  maxLinesPerFunction: 50 # TS: lines; Java: PMD NCSS statements
+  maxLinesPerFile: 500 # TS: lines; Java: PMD NCSS per class
+  duplicationMinTokens: 100 # 50 was too noisy on a mid-size Java service; 100 keeps the real clones
+  duplicationMinLines: 15
   todoMinPerFile: 1
 architecture:
   reportCircular: true
 dependencies:
   majorsBehind: 1
-  flagDeprecated: true
+  eolSpringBootBelow: 3 # Spring Boot 2.x is past open-source support
+  eolJavaBelow: 17 # minimum for Spring Boot 3
 testing:
   requireTestFile: true
 ops:
   hardcodedUrls: true
+  secretLiterals: true
   requireActuator: [health, metrics]
 churn:
   sinceDays: 180

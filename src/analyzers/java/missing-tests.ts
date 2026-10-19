@@ -1,21 +1,31 @@
-import type { Analyzer } from "../index.js";
-import { countLoc, firstLines, listSourceFiles, makeEvidence, readSource } from "../common/files.js";
+import { basename } from "node:path";
+import type { EvidenceBundle } from "../../domain/schemas.js";
+import { capLines, isTestFile } from "../common/files.js";
+import type { Analyzer } from "../context.js";
+import { javaSources } from "./sources.js";
 
-export const missingTests: Analyzer = async (ctx) => {
-  const files = await listSourceFiles(ctx.worktree, [".java"]);
-  const sources = files.filter((file) => file.includes("/src/main/java/") || file.startsWith("src/main/java/"));
-  const tests = new Set(files.filter((file) => file.includes("/src/test/java/") || file.startsWith("src/test/java/")));
-  const testNames = new Set([...tests].map((file) => file.split("/").pop()!.replace(/Tests?\.java$/i, "")));
-  const bundles = [];
-  for (const file of sources) {
-    const className = file.split("/").pop()!.replace(/\.java$/i, "");
-    if (testNames.has(className)) continue;
-    const text = await readSource(ctx.worktree, file);
-    bundles.push(makeEvidence({
-      category: "testing", rule: "missing-test-file", symbolPath: file, files: [file],
-      metrics: { value: 0, threshold: 1, loc: countLoc(text) },
-      snippet: firstLines(text, 30), stack: "java",
-    }));
+const testedName = (file: string) => /^(?:Test)?(\w+?)(?:Tests?|IT|TestCase)?\.(?:java|kt|groovy)$/.exec(basename(file))?.[1];
+
+/** Classes in src/main with no *Test / *Tests / *IT anywhere in the repo, grouped per package. JaCoCo is not read. */
+export const javaMissingTests: Analyzer = async (ctx) => {
+  if (!ctx.thresholds.testing.requireTestFile) return [];
+  const tested = new Set(ctx.files.filter(isTestFile).map(testedName).filter((n): n is string => !!n));
+  const untested = (await javaSources(ctx)).filter((s) => s.kind === "class" && !tested.has(s.name));
+
+  const byPkg = new Map<string, typeof untested>();
+  for (const s of untested) {
+    const key = `${s.module}${s.pkg}`;
+    byPkg.set(key, [...(byPkg.get(key) ?? []), s]);
   }
-  return bundles.slice(0, 250);
+  return [...byPkg].map(
+    ([pkg, classes]): EvidenceBundle => ({
+      category: "testing",
+      rule: "missing-tests",
+      symbolPath: pkg,
+      files: classes.map((c) => c.file),
+      metrics: { value: classes.length, loc: classes.reduce((n, c) => n + c.body.split("\n").length, 0) },
+      snippet: capLines(`Classes with no matching test:\n${classes.map((c) => `- ${c.name}`).join("\n")}`),
+      stack: "java",
+    }),
+  );
 };
