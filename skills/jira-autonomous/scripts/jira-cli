@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+maybe_wsl_passthrough() {
+  local uname_s
+  uname_s="$(uname -s 2>/dev/null || printf unknown)"
+
+  case "$uname_s" in
+    MINGW*|MSYS*|CYGWIN*) ;;
+    *)
+      if command -v nix >/dev/null 2>&1; then
+        return 0
+      fi
+      ;;
+  esac
+
+  if [[ -n "${WSL_DISTRO_NAME:-}" || -n "${WSL_INTEROP:-}" ]]; then
+    printf 'error: nix is required to run %s inside WSL/Linux.\n' "$(basename -- "${BASH_SOURCE[0]}")" >&2
+    exit 127
+  fi
+
+  if ! command -v wsl.exe >/dev/null 2>&1; then
+    printf 'error: nix is required to run %s. On Windows, run from Bash with WSL available and nix installed in WSL.\n' "$(basename -- "${BASH_SOURCE[0]}")" >&2
+    exit 127
+  fi
+
+  local script_dir script_path wsl_script_path cmd arg
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && (pwd -W 2>/dev/null || pwd -P))"
+  script_path="${script_dir}/$(basename -- "${BASH_SOURCE[0]}")"
+
+  # Translate "C:/foo", "/c/foo", or "/cygdrive/c/foo" to "/mnt/c/foo" without
+  # shelling out to wslpath (which can return empty on WSL cold-start).
+  if [[ "$script_path" =~ ^([A-Za-z]):[/\\](.*)$ ]]; then
+    wsl_script_path="/mnt/$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')/${BASH_REMATCH[2]//\\//}"
+  elif [[ "$script_path" =~ ^(/cygdrive)?/([A-Za-z])/(.*)$ ]]; then
+    wsl_script_path="/mnt/$(printf '%s' "${BASH_REMATCH[2]}" | tr '[:upper:]' '[:lower:]')/${BASH_REMATCH[3]}"
+  else
+    printf 'error: cannot translate %s to a WSL path\n' "$script_path" >&2
+    exit 127
+  fi
+
+  # Build one command string for `wsl.exe bash -lc`. Passing positional args
+  # after -lc drops them under MSYS-Bash, so we quote everything into the
+  # script body with %q (bash-safe shell escaping).
+  printf -v cmd 'exec bash %q' "$wsl_script_path"
+  for arg in "$@"; do printf -v cmd '%s %q' "$cmd" "$arg"; done
+
+  MSYS2_ARG_CONV_EXCL='*' exec wsl.exe bash -lc "$cmd"
+}
+
+maybe_wsl_passthrough "$@"
+
+if [ -z "${NIX_CACHE_HOME:-}" ]; then
+  NIX_CACHE_HOME="${TMPDIR:-/tmp}/ai-essentials-nix/cache"
+  mkdir -p "$NIX_CACHE_HOME" 2>/dev/null || NIX_CACHE_HOME="/tmp/ai-essentials-nix/${UID:-$(id -u)}/cache"
+  mkdir -p "$NIX_CACHE_HOME"
+  export NIX_CACHE_HOME
+fi
+
+exec nix shell --option eval-cache false "git+https://wwwin-github.cisco.com/ai-essentials/connectors?ref=refs/tags/jira-confluence-cli/v0.14.0&dir=jira-confluence-cli" --command jira-cli "$@"
