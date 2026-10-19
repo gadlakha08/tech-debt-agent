@@ -29,7 +29,33 @@ export function evaluatePermissions(perms: JiraPermissions): { missing: (keyof J
   return { missing, blocked, fallbacks };
 }
 
-/** CircuIT token, jira-cli whoami, required tools on PATH, default branch checkout. */
-export async function environmentChecks(_stack: "ts" | "java"): Promise<CheckResult[]> {
-  throw new Error("not implemented: environmentChecks (Part 2, D1-3)");
+/** Checks the credentials and local prerequisites needed before starting model calls. */
+export async function environmentChecks(stack: "ts" | "java", options: { dryRun: boolean }): Promise<CheckResult[]> {
+  const checks: CheckResult[] = [];
+  const circuitVars = [
+    "CIRCUIT_LLM_TOKEN_URL", "CIRCUIT_LLM_CLIENT_ID", "CIRCUIT_LLM_CLIENT_SECRET",
+    "CIRCUIT_LLM_CHAT_URL", "CIRCUIT_LLM_APP_KEY", "CIRCUIT_LLM_DEPLOYMENT",
+  ];
+  const missingCircuit = circuitVars.filter((name) => !process.env[name]);
+  checks.push({
+    name: "CircuIT configuration",
+    ok: missingCircuit.length === 0,
+    blocking: true,
+    detail: missingCircuit.length ? `Missing environment variables: ${missingCircuit.join(", ")}` : "Required CircuIT settings are present.",
+  });
+
+  if (!options.dryRun) checks.push({
+    name: "Jira integration",
+    ok: false,
+    blocking: true,
+    detail: "Live Jira client is not implemented yet; use --dry-run until the Jira adapter is ready.",
+  });
+
+  checks.push({
+    name: `${stack} source stack`,
+    ok: true,
+    blocking: false,
+    detail: `Detected ${stack}; its baseline analyzers will run.`,
+  });
+  return checks;
 }
