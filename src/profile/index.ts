@@ -1,23 +1,53 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { RepoProfile, type RepoProfile as RepoProfileType } from "../domain/schemas.js";
+import { existsSync, statSync } from "node:fs";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { parse, stringify } from "yaml";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { RepoProfile } from "../domain/schemas.js";
+import { debtdoctorHome, isInside } from "../paths.js";
 
-export const profilePath = (repo: string) => join(homedir(), ".techdebt", "profiles", `${repo}.yaml`);
+export const profilePath = (repo: string) => join(debtdoctorHome(), "profiles", `${repo}.yaml`);
 
-export async function loadProfile(repo: string): Promise<RepoProfileType | undefined> {
+export const defaultReportsDir = (repo: string) => join(debtdoctorHome(), "runs", repo);
+
+/** Where this repo's Scan Reports go: the profile's reportsDir, else ~/.debtdoctor/runs/<repo>. */
+export const reportsDir = (profile: RepoProfile) => profile.reportsDir ?? defaultReportsDir(profile.repo);
+
+/** Why dir can't hold Scan Reports for the clone at repoPath, or undefined if it can. Reports never go inside the scanned repo. */
+export function reportsDirProblem(dir: string, repoPath: string): string | undefined {
+  if (isInside(dir, repoPath)) return "must be outside the repo being scanned";
+  if (existsSync(dir) && !statSync(dir).isDirectory()) return "exists and is not a folder";
+  return undefined;
+}
+
+export function defaultProfile(repo: string, projectKey: string): RepoProfile {
+  return RepoProfile.parse({
+    repo,
+    jira: { projectKey, epicName: `${repo}-tech-debts` },
+  });
+}
+
+export async function loadProfile(repo: string): Promise<RepoProfile | undefined> {
+  const path = profilePath(repo);
+  let text: string;
   try {
-    const contents = await readFile(profilePath(repo), "utf8");
-    return RepoProfile.parse(parse(contents));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
+    text = await readFile(path, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw err;
   }
+  const result = RepoProfile.safeParse(parse(text));
+  if (!result.success) throw new Error(`Invalid Repo Profile ${path}: ${result.error.message}`);
+  return result.data;
 }
 
-export async function saveProfile(profile: RepoProfileType): Promise<void> {
+export async function saveProfile(profile: RepoProfile): Promise<string> {
   const path = profilePath(profile.repo);
-  await mkdir(join(homedir(), ".techdebt", "profiles"), { recursive: true });
-  await writeFile(path, stringify(profile), { encoding: "utf8", mode: 0o600 });
+  await mkdir(dirname(path), { recursive: true });
+  // owner-only: the profile names the Jira project and bot instance
+  await writeFile(path, stringify(RepoProfile.parse(profile)), { mode: 0o600 });
+  await chmod(path, 0o600); // writeFile's mode only applies when the file is created
+  return path;
 }
+
+/** The Repo Profile name for a clone: its directory name. scan, setup and doctor all use this. */
+export const repoName = (repoPath: string) => basename(resolve(repoPath));

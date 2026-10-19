@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { runScan } from "../../pipeline/run-scan.js";
+import { terminalProgress } from "../progress.js";
 
 export function registerScan(program: Command): void {
   program
@@ -11,6 +12,6 @@ export function registerScan(program: Command): void {
     .option("--max <n>", "cap the Cut at n", (v) => Number.parseInt(v, 10))
     .option("--include-defects", "list Defects in the Scan Report", false)
     .action(async (repoPath: string, o: { dryRun: boolean; uncap: boolean; max?: number; includeDefects: boolean }) => {
-      await runScan({ repoPath, ...o });
+      await runScan({ repoPath, ...o }, terminalProgress());
     });
 }
