@@ -7,12 +7,18 @@ export type DebtCategory = z.infer<typeof DebtCategory>;
 
 export const Stack = z.enum(["ts", "java"]);
 export type Stack = z.infer<typeof Stack>;
+export const BuildTool = z.enum(["maven", "gradle", "npm", "yarn", "pnpm"]);
+export type BuildTool = z.infer<typeof BuildTool>;
+/** What a repo is, read from the build file at its root: decides which analyzers run and which tools preflight checks. */
+export interface RepoKind {
+  stack: Stack;
+  build: BuildTool;
+  marker: string; // the file that decided it, e.g. "pom.xml"
+}
 
 export const Severity = z.enum(["High", "Medium", "Low"]);
 export type Severity = z.infer<typeof Severity>;
 
-export const Effort = z.enum(["S", "M", "L", "XL"]);
-export type Effort = z.infer<typeof Effort>;
 
 /** Deterministic analyzer output (Part 2). */
 export const EvidenceBundle = z.object({
@@ -22,7 +28,7 @@ export const EvidenceBundle = z.object({
   files: z.array(z.string()).min(1),
   metrics: z.object({
     fanIn: z.number().optional(),
-    loc: z.number().optional(),
+    loc: z.number().optional(), // lines of the flagged code: the method/function, else the file or the duplicated block
     value: z.number().optional(),
     threshold: z.number().optional(),
   }),
@@ -73,11 +79,9 @@ export const DebtItem = z.object({
   description: z.string(),
   findings: z.array(Finding).min(1),
   files: z.array(z.string()),
-  loc: z.number().int().nonnegative(),
   scores: RubricScores.optional(),
   score: z.number().int().optional(), // impact + reach + churn + risk
   severity: Severity.optional(),
-  effort: Effort.optional(),
   ticketKey: z.string().optional(),
 });
 export type DebtItem = z.infer<typeof DebtItem>;
@@ -90,16 +94,25 @@ export const Dossier = z.object({
 });
 export type Dossier = z.infer<typeof Dossier>;
 
+/** Jira project keys, e.g. PROJ or PROJ_SC. */
+export const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]+$/;
+/** The generic Jira user every pipeline write is made as: its jira-cli instance name and its Jira username. Not configurable. */
+export const JIRA_BOT = "techdebt-bot";
+
 export const RepoProfile = z.object({
   repo: z.string(),
   jira: z.object({
     projectKey: z.string(),
     epicName: z.string(), // default "<repo>-tech-debts"
     issueType: z.string().default("Task"),
-    instance: z.string().default("techdebt-bot"),
+    // Jira priority names differ per instance (Cisco DC uses "2-High" etc., not Major/Minor/Trivial)
+    priorities: z
+      .object({ High: z.string(), Medium: z.string(), Low: z.string() })
+      .default({ High: "2-High", Medium: "3-Medium", Low: "4-Low" }),
   }),
   includeDefects: z.boolean().default(false),
-  pricePer1MTokens: z.object({ input: z.number(), output: z.number() }),
+  // absolute folder for this repo's Scan Reports; unset means ~/.debtdoctor/runs/<repo>
+  reportsDir: z.string().optional(),
 });
 export type RepoProfile = z.infer<typeof RepoProfile>;
 
@@ -118,10 +131,33 @@ export const ScanContext = z.object({
   defaultBranch: z.string(),
   sha: z.string(), // Scanned Commit
   stack: Stack,
+  build: BuildTool,
   stackSummary: z.string(), // from acquire-codebase-knowledge scan.py
-  runDir: z.string(), // ~/.techdebt/runs/<repo>/<ts>
+  runDir: z.string(), // ~/.debtdoctor/runs/<repo>/<ts>
   profile: RepoProfile,
   fallbacks: Fallbacks,
   dryRun: z.boolean(),
 });
 export type ScanContext = z.infer<typeof ScanContext>;
+
+/** jira-cli --json output: issues carry summary/labels either at the top level or under fields. Payloads may be wrapped in { data }. */
+const JiraIssueJson = z.object({
+  key: z.string(),
+  summary: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+  fields: z.object({ summary: z.string().optional(), labels: z.array(z.string()).optional() }).optional(),
+});
+const unwrap = (p: unknown) => (p && typeof p === "object" && "data" in p ? (p as { data: unknown }).data : p);
+const wrapped = <T extends z.ZodType>(t: T) => z.preprocess(unwrap, t);
+export const JiraSearchJson = wrapped(z.object({ issues: z.array(JiraIssueJson) }));
+export const JiraCreateJson = wrapped(z.object({ key: z.string().min(1) }));
+/** GET /rest/api/2/issue/{key}?fields=labels */
+export const JiraIssueLabelsJson = z.object({ fields: z.object({ labels: z.array(z.string()).default([]) }) });
+/** `jira-cli whoami` and GET /rest/api/2/myself */
+export const JiraUserJson = wrapped(z.object({ name: z.string().min(1) }));
+
+/** GET /rest/api/2/mypermissions */
+export const JiraMyPermissionsJson = z.object({
+  permissions: z.record(z.string(), z.object({ havePermission: z.boolean().optional() })).default({}),
+});
+

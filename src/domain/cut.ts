@@ -1,7 +1,6 @@
-import type { DebtItem, Effort, Severity } from "./schemas.js";
+import type { DebtItem, Severity } from "./schemas.js";
 
 const SEVERITY_RANK: Record<Severity, number> = { High: 0, Medium: 1, Low: 2 };
-const EFFORT_RANK: Record<Effort, number> = { S: 0, M: 1, L: 2, XL: 3 };
 
 export interface CutOptions {
   floor?: number;
@@ -9,13 +8,13 @@ export interface CutOptions {
   uncap?: boolean;
 }
 
-/** Sort: Severity, then score, then smaller Effort. */
+/** Sort: Severity, then score; ties by fingerprint so the order is stable across Scans. */
 export function rank(items: DebtItem[]): DebtItem[] {
   return [...items].sort(
     (a, b) =>
       SEVERITY_RANK[a.severity ?? "Low"] - SEVERITY_RANK[b.severity ?? "Low"] ||
       (b.score ?? 0) - (a.score ?? 0) ||
-      EFFORT_RANK[a.effort ?? "XL"] - EFFORT_RANK[b.effort ?? "XL"],
+      a.fingerprint.localeCompare(b.fingerprint),
   );
 }
 
