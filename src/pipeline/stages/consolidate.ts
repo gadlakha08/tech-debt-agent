@@ -52,9 +52,6 @@ export function consolidate(findings: Finding[]): DebtItem[] {
     .map(([fp, group]) => {
       const evidence = [...group.evidence.values()];
       const files = [...new Set(evidence.flatMap((bundle) => bundle.files))].sort();
-      // Evidence for one fingerprint describes the same symbol, so use the
-      // largest reported LOC value instead of double-counting overlapping tools.
-      const loc = Math.ceil(Math.max(0, ...evidence.map((bundle) => bundle.metrics.loc ?? 0)));
       return {
         fingerprint: fp,
         category: group.category,
@@ -64,7 +61,6 @@ export function consolidate(findings: Finding[]): DebtItem[] {
         description: group.description,
         findings: [...group.findings.values()],
         files,
-        loc,
       };
     });
 }

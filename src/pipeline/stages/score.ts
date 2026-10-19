@@ -1,16 +1,19 @@
 import { z } from "zod";
 import pLimit from "p-limit";
 import type { DebtItem, ScanContext } from "../../domain/schemas.js";
-import { effortFromLoc, percentileScore, severityFromScore, totalScore } from "../../domain/rubric.js";
+import { percentileScore, severityFromScore, totalScore } from "../../domain/rubric.js";
 import { runAgent } from "../../integrations/llm/agent-loop.js";
 import type { UsageMeter } from "../../integrations/llm/usage.js";
+import { renderPrompt } from "../../prompts.js";
+import type { StageHooks } from "../progress.js";
 
-/** Reach/Churn/Effort from domain/rubric.ts; one nano call per item for Impact and Risk. */
+/** Reach/Churn from domain/rubric.ts; one nano call per item for Impact and Risk. */
 export async function score(
   ctx: ScanContext,
   items: DebtItem[],
   churn: Record<string, number>,
   usage: UsageMeter,
+  hooks: StageHooks = {},
 ): Promise<DebtItem[]> {
   if (items.length === 0) return [];
 
@@ -30,13 +33,7 @@ export async function score(
   return Promise.all(items.map((item, index) => limit(async () => {
     const modelScores = await runAgent({
       stage: "score",
-      system: [
-        "Score this technical-debt item. Use only the evidence provided and choose integer scores from 1 to 5.",
-        "Impact (how much it slows or endangers work): 1 cosmetic; 2 minor friction; 3 noticeable slowdown in this area; 4 regularly causes rework or bugs; 5 blocks or endangers core flows.",
-        "Risk (what happens if it is left): 1 nothing changes; 2 slow decay; 3 likely incidents of rework; 4 likely production issues or upgrade blockers; 5 imminent breakage, end-of-life, or unsupported.",
-        "Give a concise justification for each score, citing the supplied evidence. Do not score Reach, Churn, or Effort.",
-        `Repository stack context: ${ctx.stackSummary}`,
-      ].join("\n"),
+      system: renderPrompt("score-impact-risk.md", { stackSummary: ctx.stackSummary }),
       user: JSON.stringify({
         title: item.title,
         description: item.description,
@@ -50,6 +47,7 @@ export async function score(
           metrics: bundle.metrics,
           snippet: bundle.snippet.slice(0, 12_000),
         })),
+        // with no line count (dependencies, platform, config) there is no estimate to anchor on
       }),
       outputSchema: impactRiskSchema,
       usage,
@@ -68,7 +66,6 @@ export async function score(
       scores,
       score: scoreTotal,
       severity: severityFromScore(scoreTotal),
-      effort: effortFromLoc(item.loc),
     };
-  })));
+  }).finally(() => hooks.tick?.(item.title))));
 }

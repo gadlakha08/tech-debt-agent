@@ -5,15 +5,37 @@ import { z } from "zod";
 import type { DebtItem, Dossier, ScanContext } from "../../domain/schemas.js";
 import { runAgent } from "../../integrations/llm/agent-loop.js";
 import type { UsageMeter } from "../../integrations/llm/usage.js";
+import { renderPrompt, requiredHeadings } from "../../prompts.js";
+import type { StageHooks } from "../progress.js";
 
-export const CONTEXT_HEADINGS = ["What", "Where", "Evidence", "Why it is debt", "Scanned Commit"] as const;
-export const IMPACT_HEADINGS = ["Rubric scores", "Severity", "Effort", "Who / what is affected", "Risk of leaving it"] as const;
+const CONTEXT = "dossier-context.md";
+const IMPACT = "dossier-impact.md";
+/** Dependents passed to the model; the appended section lists more. */
+const MODEL_DEPENDENTS = 25;
+const LISTED = 50;
 
-/** Fills templates/dossier/*.md per Debt Item in the Cut; regenerates once if a heading is missing. */
-export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], usage: UsageMeter): Promise<Dossier[]> {
+/** What the Scan knows about the code around a Debt Item, from the analyzers rather than the model. */
+export interface DossierFacts {
+  /** Per shipped file, the shipped files that import it. */
+  dependents: Record<string, string[]>;
+  /** The test files that name or import any of the given files. */
+  relatedTests: (files: string[]) => Promise<string[]>;
+  churn: Record<string, number>;
+  churnDays: number;
+}
+
+/**
+ * Fills prompts/dossier-{context,impact}.md per Debt Item in the Cut; regenerates once if a heading is missing.
+ * impact.md then gets the Dependents, Tests and Recent changes sections from facts, written by code so the model can't drop or alter them.
+ */
+export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], facts: DossierFacts, usage: UsageMeter, hooks: StageHooks = {}): Promise<Dossier[]> {
   const limit = pLimit(8);
   return Promise.all(cut.map((item) => limit(async () => {
-    const outputSchema = z.object({ contextMd: z.string().min(1), impactMd: z.string().min(1) });
+    const own = new Set(item.files);
+    const dependents = [...new Set(item.files.flatMap((file) => facts.dependents[file] ?? []))].filter((file) => !own.has(file)).sort();
+    const graphed = item.files.some((file) => file in facts.dependents);
+    const tests = await facts.relatedTests(item.files);
+    const recentCommits = Object.fromEntries(item.files.map((file) => [file, facts.churn[file] ?? 0]));
     const evidence = item.findings.flatMap((finding) => finding.evidence).map((bundle) => ({
       rule: bundle.rule,
       symbolPath: bundle.symbolPath,
@@ -32,20 +54,22 @@ export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], usage: Us
       scores: item.scores,
       score: item.score,
       severity: item.severity,
-      effort: item.effort,
+      dependentCount: graphed ? dependents.length : "unknown (no import-graph data for these files)",
+      dependents: dependents.slice(0, MODEL_DEPENDENTS),
+      relatedTests: tests.slice(0, MODEL_DEPENDENTS),
+      recentCommits: { days: facts.churnDays, perFile: recentCommits },
       scannedCommit: ctx.sha,
       defaultBranch: ctx.defaultBranch,
       stackSummary: ctx.stackSummary,
     });
-    let generated = await generateDossier(outputSchema, usage, source);
-    const missing = missingRequiredHeadings(generated);
-    if (missing.length) {
-      generated = await generateDossier(outputSchema, usage, source, `Repair the Markdown. These required headings are missing: ${missing.join(", ")}. Keep the content evidence-based and include every required heading.`);
-      const remaining = missingRequiredHeadings(generated);
-      if (remaining.length) throw new Error(`Dossier ${item.fingerprint} is missing required headings: ${remaining.join(", ")}`);
-    }
+    const [contextMd, impactMd] = await Promise.all([
+      writeDocument(CONTEXT, "context.md", skeleton(CONTEXT, ctx, item), source, usage, item),
+      writeDocument(IMPACT, "impact.md", skeleton(IMPACT, ctx, item), source, usage, item).then(
+        (markdown) => `${markdown.trimEnd()}\n\n${factSections(item, graphed ? dependents : undefined, tests, recentCommits, facts.churnDays)}`,
+      ),
+    ]);
 
-    const dossier: Dossier = { fingerprint: item.fingerprint, ...generated };
+    const dossier: Dossier = { fingerprint: item.fingerprint, contextMd, impactMd };
     const itemDir = join(ctx.runDir, item.fingerprint);
     await mkdir(itemDir, { recursive: true });
     await Promise.all([
@@ -53,39 +77,76 @@ export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], usage: Us
       writeFile(join(itemDir, "impact.md"), dossier.impactMd, "utf8"),
     ]);
     return dossier;
-  })));
+  }).finally(() => hooks.tick?.(item.title))));
 }
 
-async function generateDossier(
-  outputSchema: z.ZodObject<{ contextMd: z.ZodString; impactMd: z.ZodString }>,
-  usage: UsageMeter,
-  source: string,
-  repairInstruction?: string,
-): Promise<{ contextMd: string; impactMd: string }> {
-  return runAgent({
-    stage: "dossier",
-    system: [
-      "Write two concise, accurate Markdown documents for a technical-debt item.",
-      `context.md must contain these headings: ${CONTEXT_HEADINGS.join(", ")}.`,
-      `impact.md must contain these headings: ${IMPACT_HEADINGS.join(", ")}.`,
-      "Use evidence and rubric values supplied in the input. Do not invent causes, callers, or impacts.",
-      "Return the complete Markdown in contextMd and impactMd, including heading markers.",
-      repairInstruction ?? "",
-    ].filter(Boolean).join("\n"),
-    user: source,
-    outputSchema,
-    usage,
+const Markdown = z.object({ markdown: z.string().min(1) });
+
+/** One document per call (asking for both at once let the model drop one); regenerates once if a heading is missing. */
+async function writeDocument(file: string, document: string, filled: string, source: string, usage: UsageMeter, item: DebtItem): Promise<string> {
+  const system = renderPrompt("dossier.md", { document, skeleton: filled });
+  const generate = async (prompt: string) => (await runAgent({ stage: "dossier", system: prompt, user: source, outputSchema: Markdown, usage })).markdown;
+  let markdown = await generate(system);
+  let missing = missingHeadings(file, markdown);
+  if (missing.length) {
+    markdown = await generate(`${system}\n\n${renderPrompt("dossier-repair.md", { document, missing: missing.join(", ") })}`);
+    missing = missingHeadings(file, markdown);
+    if (missing.length) throw new Error(`Dossier ${item.fingerprint} ${document} is missing required headings: ${missing.join(", ")}`);
+  }
+  return markdown;
+}
+
+/** A skeleton with the facts code already knows filled in; the model writes the prose. */
+function skeleton(file: string, ctx: ScanContext, item: DebtItem): string {
+  const s = item.scores;
+  return renderPrompt(file, {
+    title: item.title,
+    sha: ctx.sha,
+    defaultBranch: ctx.defaultBranch,
+    impact: s?.impact ?? "—",
+    reach: s?.reach ?? "—",
+    churn: s?.churn ?? "—",
+    risk: s?.risk ?? "—",
+    score: item.score ?? "—",
+    severity: item.severity ?? "Low",
   });
 }
 
-function missingRequiredHeadings(dossier: { contextMd: string; impactMd: string }): string[] {
-  const required = [
-    ...CONTEXT_HEADINGS.map((heading) => ({ document: "context.md", heading, content: dossier.contextMd })),
-    ...IMPACT_HEADINGS.map((heading) => ({ document: "impact.md", heading, content: dossier.impactMd })),
-  ];
-  return required
-    .filter(({ heading, content }) => !new RegExp(`^#{1,6}\\s+${escapeRegExp(heading)}\\s*$`, "im").test(content))
-    .map(({ document, heading }) => `${document}: ${heading}`);
+/** The appended impact.md sections: who imports the code, which tests touch it, how often it changed. undefined dependents = no graph data. */
+export function factSections(item: DebtItem, dependents: string[] | undefined, tests: string[], commits: Record<string, number>, days: number): string {
+  const subject = item.files.length === 1 ? `\`${item.files[0]}\`` : `these ${item.files.length} files`;
+  const list = (files: string[]) =>
+    [...files.slice(0, LISTED).map((file) => `- \`${file}\``), ...(files.length > LISTED ? [`- … and ${files.length - LISTED} more`] : [])].join("\n");
+  const dependentsText =
+    dependents === undefined
+      ? "The import graph has no data for this code (it failed, or the files are not shipped source)."
+      : dependents.length
+        ? `Shipped files that import ${subject} at the Scanned Commit (tests excluded):\n${list(dependents)}`
+        : `No other shipped file imports ${subject}.`;
+  const testsText = tests.length
+    ? `Test files that are named after or import ${subject}:\n${list(tests)}`
+    : `No test file is named after or imports ${subject}. Add tests that pin today's behaviour before changing it.`;
+  const changes = Object.entries(commits)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, LISTED)
+    .map(([file, n]) => `- \`${file}\`: ${n} commit${n === 1 ? "" : "s"}`)
+    .join("\n");
+  return [
+    `## Dependents (${dependents?.length ?? "unknown"})`,
+    dependentsText,
+    "",
+    `## Tests (${tests.length})`,
+    testsText,
+    "",
+    "## Recent changes",
+    `Commits touching the affected files in the last ${days} days:`,
+    changes || "- none",
+    "",
+  ].join("\n");
+}
+
+function missingHeadings(file: string, markdown: string): string[] {
+  return requiredHeadings(file).filter((heading) => !new RegExp(`^#{1,6}\\s+${escapeRegExp(heading)}\\s*$`, "im").test(markdown));
 }
 
 function escapeRegExp(value: string): string {

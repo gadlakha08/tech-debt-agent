@@ -1,5 +1,5 @@
 import type { ScanReport } from "./index.js";
-import { costUsd } from "./cost.js";
+import { costUsd } from "../integrations/llm/pricing.js";
 
 export function renderMarkdown(report: ScanReport): string {
   const usage = report.usage.byStage();
@@ -28,12 +28,12 @@ export function renderMarkdown(report: ScanReport): string {
     lines.push("", "Defects are counted here and are not included in the debt Cut.");
   }
 
-  lines.push("", "## Model usage", "", "| Stage | Input tokens | Output tokens |", "|---|---:|---:|");
+  lines.push("", "## Model usage", "", `Model: \`${report.model ?? "unknown"}\``, "", "| Stage | Input tokens | Output tokens |", "|---|---:|---:|");
   for (const [stage, counts] of Object.entries(usage).sort(([a], [b]) => a.localeCompare(b))) {
     lines.push(`| ${escapeCell(stage)} | ${counts.promptTokens} | ${counts.completionTokens} |`);
   }
   lines.push(`| **Total** | **${totals.promptTokens}** | **${totals.completionTokens}** |`);
-  if (report.pricePer1MTokens) lines.push("", `Estimated model cost: **$${costUsd(totals, report.pricePer1MTokens).toFixed(4)}**`);
+  lines.push("", report.price ? `Estimated model cost: **$${costUsd(totals, report.price).toFixed(4)}**` : `Estimated model cost: unknown (no price for \`${report.model ?? "unknown"}\` in MODEL_PRICES)`);
   lines.push("");
   return lines.join("\n");
 }
@@ -41,11 +41,11 @@ export function renderMarkdown(report: ScanReport): string {
 function renderItems(items: ScanReport["cut"]): string[] {
   if (items.length === 0) return ["No items."];
   return [
-    "| Severity | Score | Effort | Category | Debt item | Fingerprint | Ticket |",
+    "| Severity | Score | Category | Debt item | Fingerprint | Ticket |",
     "|---|---:|---|---|---|---|---|",
     ...items.map((item) => {
       const ticket = item.ticketKey ? `\`${item.ticketKey}\`` : "—";
-      return `| ${item.severity ?? "Unscored"} | ${item.score ?? "—"} | ${item.effort ?? "—"} | ${item.category} | ${escapeCell(item.title)} | \`${item.fingerprint}\` | ${ticket} |`;
+      return `| ${item.severity ?? "Unscored"} | ${item.score ?? "—"} | ${item.category} | ${escapeCell(item.title)} | \`${item.fingerprint}\` | ${ticket} |`;
     }),
   ];
 }

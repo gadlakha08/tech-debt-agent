@@ -1,50 +1,42 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename, join } from "node:path";
-import { runAnalyzers, detectStack } from "../analyzers/index.js";
-import type { EvidenceBundle } from "../domain/schemas.js";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { loadThresholds } from "../analyzers/config/index.js";
+import { runAnalyzers } from "../analyzers/index.js";
+import { stackSummary } from "../analyzers/stack.js";
+import type { EvidenceBundle, ScanContext } from "../domain/schemas.js";
 import { churn } from "../integrations/git/churn.js";
-import { checkout, removeWorktree } from "../integrations/git/worktree.js";
+import type { StageHooks } from "./progress.js";
 
-export interface EvidenceScanResult {
-  repo: string;
-  defaultBranch: string;
-  sha: string;
-  stack: "ts" | "java";
+export interface EvidenceScan {
   evidence: EvidenceBundle[];
+  /** Per shipped file, the shipped files that depend on it (from the import graph; empty if it failed). */
+  dependents: Record<string, string[]>;
+  /** Every file in the worktree the analyzers saw (repo-relative). */
+  files: string[];
   churn: Record<string, number>;
-  outputPath: string;
+  churnDays: number;
+  stackSummary: string;
+  warnings: string[];
 }
 
-/** Run the deterministic baseline analyzers on a clean temporary checkout and save evidence outside the repo. */
-export async function scanEvidence(repoPath: string): Promise<EvidenceScanResult> {
-  const checkedOut = await checkout(repoPath);
-  try {
-    const stack = await detectStack(checkedOut.worktree);
-    const [evidence, fileChurn] = await Promise.all([
-      runAnalyzers({ worktree: checkedOut.worktree, stack }),
-      churn({ worktree: checkedOut.worktree }),
-    ]);
-    const repo = basename(repoPath.replace(/\/+$/, "")) || "repository";
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const outputDir = join(homedir(), ".techdebt", "evidence", safeSegment(repo), timestamp);
-    await mkdir(outputDir, { recursive: true });
-    const outputPath = join(outputDir, "evidence.json");
-    await writeFile(outputPath, `${JSON.stringify({
-      repo,
-      defaultBranch: checkedOut.defaultBranch,
-      sha: checkedOut.sha,
-      stack,
-      generatedAt: new Date().toISOString(),
-      evidence,
-      churn: fileChurn,
-    }, null, 2)}\n`, "utf8");
-    return { repo, defaultBranch: checkedOut.defaultBranch, sha: checkedOut.sha, stack, evidence, churn: fileChurn, outputPath };
-  } finally {
-    await removeWorktree(repoPath, checkedOut.worktree);
-  }
-}
-
-function safeSegment(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100) || "repository";
+/** Deterministic stage: analyzers, churn and the stack summary over the worktree; saves evidence.json in the run dir. */
+export async function scanEvidence(ctx: Pick<ScanContext, "worktree" | "stack" | "build" | "runDir" | "sha">, hooks: StageHooks = {}): Promise<EvidenceScan> {
+  const thresholds = await loadThresholds();
+  const warnings: string[] = [];
+  const onWarning = (m: string) => {
+    warnings.push(m);
+    (hooks.warn ?? ((w: string) => console.warn(`! ${w}`)))(m);
+  };
+  const [analyzed, fileChurn, summary] = await Promise.all([
+    runAnalyzers(ctx, { thresholds, onWarning, onAnalyzerDone: hooks.tick }),
+    churn(ctx, thresholds.churn.sinceDays).catch((err: unknown) => {
+      onWarning(`churn unavailable, scoring without it: ${err instanceof Error ? err.message : String(err)}`);
+      return {};
+    }),
+    stackSummary(ctx.worktree),
+  ]);
+  const dependents = Object.fromEntries(analyzed.dependents);
+  const result = { evidence: analyzed.bundles, dependents, churn: fileChurn, churnDays: thresholds.churn.sinceDays, stackSummary: summary, warnings };
+  await writeFile(join(ctx.runDir, "evidence.json"), `${JSON.stringify({ sha: ctx.sha, stack: ctx.stack, ...result }, null, 2)}\n`);
+  return { ...result, files: analyzed.files };
 }
