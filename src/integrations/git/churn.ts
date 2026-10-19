@@ -1,18 +1,13 @@
-import { execa } from "execa";
+import type { ScanContext } from "../../domain/schemas.js";
+import { runOrThrow } from "../../shell.js";
 
-export interface ChurnContext {
-  worktree: string;
-}
-
-/** `git log --since=180.days --name-only --pretty=format:` → commits per file. */
-export async function churn(ctx: ChurnContext): Promise<Record<string, number>> {
-  const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-  const result = await execa("git", ["log", `--since=${since}`, "--name-only", "--pretty=format:"], { cwd: ctx.worktree });
+/** `git log --since=<days>.days --name-only --pretty=format:` → commits per file (paths relative to the repo root). */
+export async function churn(ctx: Pick<ScanContext, "worktree">, sinceDays: number): Promise<Record<string, number>> {
+  const out = await runOrThrow("git", ["-C", ctx.worktree, "log", `--since=${sinceDays}.days`, "--name-only", "--pretty=format:", "--no-renames"]);
   const counts: Record<string, number> = {};
-  for (const raw of result.stdout.split(/\r?\n/)) {
-    const file = raw.trim().replace(/\\/g, "/");
-    if (!file) continue;
-    counts[file] = (counts[file] ?? 0) + 1;
+  for (const line of out.split("\n")) {
+    const file = line.trim();
+    if (file) counts[file] = (counts[file] ?? 0) + 1;
   }
   return counts;
 }

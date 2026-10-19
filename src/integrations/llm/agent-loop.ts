@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import { chat, type ChatMessage, type ToolSpec } from "./circuit-client.js";
 import type { UsageMeter } from "./usage.js";
 
@@ -25,13 +25,10 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
   const resultName = "submit_result";
   if (opts.tools?.some((tool) => tool.name === resultName)) throw new Error(`Tool name "${resultName}" is reserved.`);
 
+  const { parameters, wrapped } = resultParameters(opts.outputSchema);
   const resultTool: ToolSpec = {
     type: "function",
-    function: {
-      name: resultName,
-      description: "Return the final result in the required schema.",
-      parameters: z.toJSONSchema(opts.outputSchema) as Record<string, unknown>,
-    },
+    function: { name: resultName, description: "Return the final result in the required schema.", parameters },
   };
   const tools: ToolSpec[] = [
     ...(opts.tools ?? []).map((tool) => ({
@@ -55,10 +52,10 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
       messages.push(response.message);
       for (const call of calls) {
         if (call.function.name === resultName) {
-          const parsed = parseResult(call.function.arguments, opts.outputSchema);
+          const parsed = parseResult(call.function.arguments, opts.outputSchema, wrapped);
           if (parsed.success) return parsed.data;
           lastValidationError = parsed.error;
-          if (validationRetries >= 1) throw new Error(`Agent returned invalid output after one retry: ${lastValidationError}`);
+          if (validationRetries >= 1) throw new Error(`${opts.stage}: agent returned invalid output after one retry: ${lastValidationError}`);
           validationRetries += 1;
           messages.push({ role: "tool", tool_call_id: call.id, content: `Schema validation failed: ${lastValidationError}. Call ${resultName} again with a corrected object.` });
           continue;
@@ -85,7 +82,7 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
       const parsed = parseResult(response.message.content, opts.outputSchema);
       if (parsed.success) return parsed.data;
       lastValidationError = parsed.error;
-      if (validationRetries >= 1) throw new Error(`Agent returned invalid output after one retry: ${lastValidationError}`);
+      if (validationRetries >= 1) throw new Error(`${opts.stage}: agent returned invalid output after one retry: ${lastValidationError}`);
       validationRetries += 1;
       messages.push(response.message, {
         role: "user",
@@ -97,7 +94,20 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
     messages.push(response.message, { role: "user", content: `No result was returned. Call the ${resultName} tool with your final answer.` });
   }
 
-  throw new Error(`Agent exceeded its ${maxSteps}-step limit${lastValidationError ? `; last schema error: ${lastValidationError}` : ""}.`);
+  throw new Error(`${opts.stage}: agent exceeded its ${maxSteps}-step limit${lastValidationError ? `; last schema error: ${lastValidationError}` : ""}.`);
+}
+
+/**
+ * Function parameters must be a top-level object schema, so a union (e.g. Classification) is sent as { result: <schema> }.
+ * $defs stay at the top so their #/$defs refs still resolve.
+ */
+function resultParameters(schema: z.ZodType): { parameters: Record<string, unknown>; wrapped: boolean } {
+  const { $schema: _, $defs, ...json } = z.toJSONSchema(schema) as Record<string, unknown>;
+  if (json.type === "object") return { parameters: { ...json, ...($defs ? { $defs } : {}) }, wrapped: false };
+  return {
+    parameters: { type: "object", properties: { result: json }, required: ["result"], additionalProperties: false, ...($defs ? { $defs } : {}) },
+    wrapped: true,
+  };
 }
 
 function parseArguments(value: string): unknown {
@@ -108,9 +118,10 @@ function parseArguments(value: string): unknown {
   }
 }
 
-function parseResult<T extends z.ZodType>(value: string, schema: T): { success: true; data: z.infer<T> } | { success: false; error: string } {
+function parseResult<T extends z.ZodType>(value: string, schema: T, wrapped = false): { success: true; data: z.infer<T> } | { success: false; error: string } {
   try {
-    const raw = JSON.parse(stripCodeFence(value)) as unknown;
+    const parsed = JSON.parse(stripCodeFence(value)) as unknown;
+    const raw = wrapped && parsed && typeof parsed === "object" && "result" in parsed ? (parsed as { result: unknown }).result : parsed;
     const result = schema.safeParse(raw);
     return result.success ? { success: true, data: result.data } : { success: false, error: result.error.message };
   } catch (error) {

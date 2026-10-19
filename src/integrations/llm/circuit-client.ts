@@ -32,6 +32,9 @@ export interface ChatResponse {
   finishReason: string;
 }
 
+/** Chat settings every LLM call needs; preflight checks them before the Scan starts. */
+export const CIRCUIT_CHAT_ENV = ["CIRCUIT_LLM_CHAT_URL", "CIRCUIT_LLM_DEPLOYMENT", "CIRCUIT_LLM_APP_KEY"] as const;
+
 /**
  * POST {CIRCUIT_LLM_CHAT_URL}/openai/deployments/{CIRCUIT_LLM_DEPLOYMENT}/chat/completions
  * Header `api-key: <token>` (no Bearer). Body `user: JSON.stringify({ appkey })`. Never send `temperature`.
@@ -50,17 +53,38 @@ export async function chat(req: ChatRequest, usage: UsageMeter): Promise<ChatRes
   if (req.toolChoice) body.tool_choice = req.toolChoice;
   if (req.responseFormat) body.response_format = req.responseFormat;
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-      "api-key": token,
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+          "api-key": token,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (err) {
+      // network drop (VPN, DNS, reset): same backoff as a 5xx
+      if (attempt >= MAX_ATTEMPTS) throw new Error(`CircuIT unreachable at stage "${req.stage}" after ${attempt} attempts: ${(err as Error).message}`);
+      await sleep(Math.min(60_000, 1000 * 2 ** attempt + Math.random() * 1000));
+      continue;
+    }
+    if (!RETRYABLE.has(response.status) || attempt >= MAX_ATTEMPTS) break;
+    await sleep(retryDelayMs(response, await response.text().catch(() => ""), attempt));
+  }
   if (!response.ok) {
-    throw new Error(`CircuIT chat request failed (${response.status} ${response.statusText}) at stage "${req.stage}".`);
+    // only error.message: the gateway echoes the request's `user` field (the appkey) in its error body
+    const text = await response.text().catch(() => "");
+    let detail: string;
+    try {
+      detail = String((JSON.parse(text) as { error?: { message?: unknown } }).error?.message ?? "");
+    } catch {
+      detail = text.includes("appkey") ? "" : text.replace(/\s+/g, " ");
+    }
+    detail = detail.slice(0, 500);
+    throw new Error(`CircuIT chat request failed (${response.status}) at stage "${req.stage}": ${detail || "no response body"}`);
   }
 
   const payload: unknown = await response.json();
@@ -87,6 +111,18 @@ export async function chat(req: ChatRequest, usage: UsageMeter): Promise<ChatRes
     message,
     finishReason: typeof choice.finish_reason === "string" ? choice.finish_reason : "unknown",
   };
+}
+
+const RETRYABLE = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 6;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Retry-After (s), retry-after-ms, or the gateway's "retry after N milliseconds"; else exponential backoff. Jittered, capped at 60 s. */
+function retryDelayMs(response: Response, text: string, attempt: number): number {
+  const header = Number(response.headers.get("retry-after-ms") ?? Number(response.headers.get("retry-after")) * 1000);
+  const fromText = Number(/retry after ([\d.]+) milliseconds/i.exec(text)?.[1]);
+  const base = Number.isFinite(header) && header > 0 ? header : Number.isFinite(fromText) && fromText > 0 ? fromText : 1000 * 2 ** attempt;
+  return Math.min(60_000, base + Math.random() * 1000);
 }
 
 function requiredEnv(name: string): string {

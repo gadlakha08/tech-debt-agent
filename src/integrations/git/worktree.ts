@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { execa } from "execa";
+import { run, runOrThrow } from "../../shell.js";
 
 export interface Checkout {
   worktree: string;
@@ -9,43 +9,46 @@ export interface Checkout {
   defaultBranch: string;
 }
 
-/** Temp worktree of origin/main or origin/master; never touches the user's working copy. */
-export async function checkout(repoPath: string): Promise<Checkout> {
-  const rootResult = await execa("git", ["rev-parse", "--show-toplevel"], { cwd: repoPath });
-  const repoRoot = rootResult.stdout.trim();
-  const defaultRef = await execa("git", ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], { cwd: repoRoot, reject: false });
-  let defaultBranch = defaultRef.exitCode === 0 ? defaultRef.stdout.trim().replace(/^origin\//, "") : "";
+// BatchMode stops ssh asking for a key passphrase mid-Scan; without a loaded key the fetch fails and the local ref is used
+const NO_PROMPT = { GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND ?? "ssh -o BatchMode=yes" };
+const PREFIX = "debtdoctor-wt-";
 
-  if (!defaultBranch) {
-    const remoteBranches = await execa("git", ["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"], { cwd: repoRoot });
-    const branches = new Set(remoteBranches.stdout.split(/\r?\n/).map((line) => line.trim()));
-    defaultBranch = branches.has("origin/main") ? "main" : branches.has("origin/master") ? "master" : "";
-  }
-  if (!defaultBranch) throw new Error("Could not determine origin/main or origin/master. Set origin/HEAD or fetch the default branch first.");
-
-  const remoteRef = `origin/${defaultBranch}`;
-  const exists = await execa("git", ["show-ref", "--verify", "--quiet", `refs/remotes/${remoteRef}`], { cwd: repoRoot, reject: false });
-  if (exists.exitCode !== 0) throw new Error(`Remote branch ${remoteRef} is unavailable. Fetch the repository before scanning.`);
-
-  const worktree = await mkdtemp(join(tmpdir(), "techdebt-scan-"));
-  try {
-    await rm(worktree, { recursive: true, force: true });
-    await execa("git", ["worktree", "add", "--detach", worktree, remoteRef], { cwd: repoRoot });
-    const shaResult = await execa("git", ["rev-parse", "HEAD"], { cwd: worktree });
-    return { worktree, sha: shaResult.stdout.trim(), defaultBranch };
-  } catch (error) {
-    await rm(worktree, { recursive: true, force: true });
-    throw error;
-  }
+async function hasRef(repoPath: string, ref: string): Promise<boolean> {
+  return (await run("git", ["-C", repoPath, "rev-parse", "--verify", "--quiet", ref])).exitCode === 0;
 }
 
-export async function removeWorktree(repoPath: string, worktree: string): Promise<void> {
-  const repoRoot = (await execa("git", ["rev-parse", "--show-toplevel"], { cwd: repoPath })).stdout.trim();
-  const resolvedWorktree = resolve(worktree);
-  if (dirname(resolvedWorktree) !== resolve(tmpdir()) || !basename(resolvedWorktree).startsWith("techdebt-scan-")) {
-    throw new Error("Refusing to remove a worktree outside the tech-debt temporary directory.");
+/** origin/HEAD if set, else main, else master. */
+export async function defaultBranch(repoPath: string): Promise<string> {
+  const head = await run("git", ["-C", repoPath, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
+  if (head.exitCode === 0 && head.stdout.startsWith("origin/")) return head.stdout.slice("origin/".length);
+  for (const b of ["main", "master"]) if (await hasRef(repoPath, `refs/remotes/origin/${b}`)) return b;
+  throw new Error(`${repoPath}: no origin/HEAD, origin/main or origin/master`);
+}
+
+/**
+ * Temp worktree of origin/main or origin/master; never touches the user's working copy.
+ * Fetches first (best effort, never prompts); if the fetch fails the local origin/<branch> ref is used.
+ */
+export async function checkout(repoPath: string): Promise<Checkout & { fetched: boolean }> {
+  const branch = await defaultBranch(repoPath);
+  const fetch = await run("git", ["-C", repoPath, "fetch", "--quiet", "origin", branch], { env: NO_PROMPT, timeoutMs: 120_000 });
+  const worktree = await mkdtemp(join(tmpdir(), PREFIX));
+  try {
+    await runOrThrow("git", ["-C", repoPath, "worktree", "add", "--quiet", "--detach", worktree, `origin/${branch}`]);
+  } catch (err) {
+    await rm(worktree, { recursive: true, force: true });
+    throw err;
   }
-  await execa("git", ["worktree", "remove", "--force", worktree], { cwd: repoRoot, reject: false });
-  await rm(worktree, { recursive: true, force: true });
-  await execa("git", ["worktree", "prune"], { cwd: repoRoot });
+  const sha = await runOrThrow("git", ["-C", worktree, "rev-parse", "HEAD"]);
+  return { worktree, sha, defaultBranch: branch, fetched: fetch.exitCode === 0 };
+}
+
+/** Removes a worktree made by checkout(); refuses any other path so a bad argument can never delete real work. */
+export async function removeWorktree(repoPath: string, worktree: string): Promise<void> {
+  const path = resolve(worktree);
+  if (dirname(path) !== resolve(tmpdir()) || !basename(path).startsWith(PREFIX))
+    throw new Error(`Refusing to remove ${worktree}: not a tech-debt temp worktree`);
+  await run("git", ["-C", repoPath, "worktree", "remove", "--force", path]);
+  await rm(path, { recursive: true, force: true });
+  await run("git", ["-C", repoPath, "worktree", "prune"]);
 }
