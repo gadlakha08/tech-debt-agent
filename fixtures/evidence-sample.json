@@ -1,0 +1,307 @@
+[
+  {
+    "category": "code",
+    "rule": "complexity",
+    "symbolPath": "src/app/users/user-table.component#buildRows",
+    "files": [
+      "src/app/users/user-table.component.ts"
+    ],
+    "metrics": {
+      "value": 17,
+      "threshold": 10,
+      "loc": 284,
+      "fanIn": 3
+    },
+    "snippet": "complexity: Method 'buildRows' has a complexity of 17. Maximum allowed is 10.\n\nexport function buildRows(rows: Row[], opts: Options) {\n  if (opts.flag0 && rows[0]?.status === 'S0') { out.push(map0(rows[0])); }\n  if (opts.flag1 && rows[1]?.status === 'S1') { out.push(map1(rows[1])); }\n  if (opts.flag2 && rows[2]?.status === 'S2') { out.push(map2(rows[2])); }\n  if (opts.flag3 && rows[3]?.status === 'S3') { out.push(map3(rows[3])); }\n  if (opts.flag4 && rows[4]?.status === 'S4') { out.push(map4(rows[4])); }\n  if (opts.flag5 && rows[5]?.status === 'S5') { out.push(map5(rows[5])); }\n  if (opts.flag6 && rows[6]?.status === 'S6') { out.push(map6(rows[6])); }\n  if (opts.flag7 && rows[7]?.status === 'S7') { out.push(map7(rows[7])); }\n  if (opts.flag8 && rows[8]?.status === 'S8') { out.push(map8(rows[8])); }\n  if (opts.flag9 && rows[9]?.status === 'S9') { out.push(map9(rows[9])); }\n  if (opts.flag10 && rows[10]?.status === 'S10') { out.push(map10(rows[10])); }\n  if (opts.flag11 && rows[11]?.status === 'S11') { out.push(map11(rows[11])); }\n  if (opts.flag12 && rows[12]?.status === 'S12') { out.push(map12(rows[12])); }\n  if (opts.flag13 && rows[13]?.status === 'S13') { out.push(map13(rows[13])); }\n  if (opts.flag14 && rows[14]?.status === 'S14') { out.push(map14(rows[14])); }\n  if (opts.flag15 && rows[15]?.status === 'S15') { out.push(map15(rows[15])); }\n  return out;\n}",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "complexity",
+    "symbolPath": "src/services/billing/invoice-calculator#applyDiscounts",
+    "files": [
+      "src/services/billing/invoice-calculator.ts"
+    ],
+    "metrics": {
+      "value": 24,
+      "threshold": 10,
+      "loc": 410,
+      "fanIn": 9
+    },
+    "snippet": "complexity: Function 'applyDiscounts' has a complexity of 24. Maximum allowed is 10.\n\nexport function applyDiscounts(rows: Row[], opts: Options) {\n  if (opts.flag0 && rows[0]?.status === 'S0') { out.push(map0(rows[0])); }\n  if (opts.flag1 && rows[1]?.status === 'S1') { out.push(map1(rows[1])); }\n  if (opts.flag2 && rows[2]?.status === 'S2') { out.push(map2(rows[2])); }\n  if (opts.flag3 && rows[3]?.status === 'S3') { out.push(map3(rows[3])); }\n  if (opts.flag4 && rows[4]?.status === 'S4') { out.push(map4(rows[4])); }\n  if (opts.flag5 && rows[5]?.status === 'S5') { out.push(map5(rows[5])); }\n  if (opts.flag6 && rows[6]?.status === 'S6') { out.push(map6(rows[6])); }\n  if (opts.flag7 && rows[7]?.status === 'S7') { out.push(map7(rows[7])); }\n  if (opts.flag8 && rows[8]?.status === 'S8') { out.push(map8(rows[8])); }\n  if (opts.flag9 && rows[9]?.status === 'S9') { out.push(map9(rows[9])); }\n  if (opts.flag10 && rows[10]?.status === 'S10') { out.push(map10(rows[10])); }\n  if (opts.flag11 && rows[11]?.status === 'S11') { out.push(map11(rows[11])); }\n  if (opts.flag12 && rows[12]?.status === 'S12') { out.push(map12(rows[12])); }\n  if (opts.flag13 && rows[13]?.status === 'S13') { out.push(map13(rows[13])); }\n  if (opts.flag14 && rows[14]?.status === 'S14') { out.push(map14(rows[14])); }\n  if (opts.flag15 && rows[15]?.status === 'S15') { out.push(map15(rows[15])); }\n  if (opts.flag16 && rows[16]?.status === 'S16') { out.push(map16(rows[16])); }\n  if (opts.flag17 && rows[17]?.status === 'S17') { out.push(map17(rows[17])); }\n  if (opts.flag18 && rows[18]?.status === 'S18') { out.push(map18(rows[18])); }\n  if (opts.flag19 && rows[19]?.status === 'S19') { out.push(map19(rows[19])); }\n  if (opts.flag20 && rows[20]?.status === 'S20') { out.push(map20(rows[20])); }\n  if (opts.flag21 && rows[21]?.status === 'S21') { out.push(map21(rows[21])); }\n  return out;\n}",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "long-function",
+    "symbolPath": "src/pages/settings/SettingsPage#SettingsPage",
+    "files": [
+      "src/pages/settings/SettingsPage.tsx"
+    ],
+    "metrics": {
+      "value": 612,
+      "threshold": 50,
+      "loc": 701,
+      "fanIn": 1
+    },
+    "snippet": "max-lines-per-function: Function 'SettingsPage' has too many lines (612). Maximum allowed is 50.\n\nexport function SettingsPage() {\n  const [tab, setTab] = useState('general');\n  const [draft, setDraft] = useState<Settings | null>(null);\n  // ... 600 more lines of tabs, forms and inline handlers\n}",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "deep-nesting",
+    "symbolPath": "src/services/sync/reconcile#reconcile",
+    "files": [
+      "src/services/sync/reconcile.ts"
+    ],
+    "metrics": {
+      "value": 6,
+      "threshold": 3,
+      "loc": 190,
+      "fanIn": 2
+    },
+    "snippet": "max-depth: Blocks are nested too deeply (6). Maximum allowed is 3.\n\nfor (const tenant of tenants) {\n  for (const user of tenant.users) {\n    if (user.active) {\n      for (const role of user.roles) {\n        if (role.scoped) {\n          if (!seen.has(role.id)) { pending.push(role); }\n        }\n      }\n    }\n  }\n}",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "large-file",
+    "symbolPath": "src/pages/settings/SettingsPage",
+    "files": [
+      "src/pages/settings/SettingsPage.tsx"
+    ],
+    "metrics": {
+      "value": 701,
+      "threshold": 500,
+      "loc": 701,
+      "fanIn": 1
+    },
+    "snippet": "max-lines: File has too many lines (701). Maximum allowed is 500.",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "duplication",
+    "symbolPath": "src/api/users-client ~ src/api/groups-client",
+    "files": [
+      "src/api/groups-client.ts",
+      "src/api/users-client.ts"
+    ],
+    "metrics": {
+      "loc": 48,
+      "value": 2,
+      "threshold": 15,
+      "fanIn": 7
+    },
+    "snippet": "src/api/users-client.ts:12-41 \u2248 src/api/groups-client.ts:10-39\nasync function request<T>(path: string, init: RequestInit = {}): Promise<T> {\n  const token = await getToken();\n  const res = await fetch(`${baseUrl()}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } });\n  if (res.status === 401) { await refresh(); return request(path, init); }\n  if (!res.ok) throw new ApiError(res.status, await res.text());\n  return res.json() as Promise<T>;\n}",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "duplication",
+    "symbolPath": "src/pages/users/UserForm ~ src/pages/groups/GroupForm",
+    "files": [
+      "src/pages/groups/GroupForm.tsx",
+      "src/pages/users/UserForm.tsx"
+    ],
+    "metrics": {
+      "loc": 33,
+      "value": 1,
+      "threshold": 15,
+      "fanIn": 1
+    },
+    "snippet": "src/pages/users/UserForm.tsx:40-72 \u2248 src/pages/groups/GroupForm.tsx:38-70\n<Field label=\"Name\" error={errors.name}>\n  <Input value={values.name} onChange={(e) => setField('name', e.target.value)} />\n</Field>\n...",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "todo-comments",
+    "symbolPath": "src/services/auth/session",
+    "files": [
+      "src/services/auth/session.ts"
+    ],
+    "metrics": {
+      "value": 3,
+      "loc": 120,
+      "fanIn": 11
+    },
+    "snippet": "14: // TODO: refresh token before expiry instead of on 401\n52: // FIXME: race when two tabs refresh at once\n88: // HACK: clear storage twice for Safari",
+    "stack": "ts"
+  },
+  {
+    "category": "architecture",
+    "rule": "circular-import",
+    "symbolPath": "src/store/users <-> src/store/groups",
+    "files": [
+      "src/store/groups.ts",
+      "src/store/users.ts"
+    ],
+    "metrics": {
+      "value": 2,
+      "fanIn": 8
+    },
+    "snippet": "Import cycle:\nsrc/store/users.ts -> src/store/groups.ts -> src/store/users.ts",
+    "stack": "ts"
+  },
+  {
+    "category": "architecture",
+    "rule": "circular-import",
+    "symbolPath": "src/services/auth/session <-> src/api/http <-> src/services/auth/refresh",
+    "files": [
+      "src/api/http.ts",
+      "src/services/auth/refresh.ts",
+      "src/services/auth/session.ts"
+    ],
+    "metrics": {
+      "value": 3,
+      "fanIn": 14
+    },
+    "snippet": "Import cycle:\nsrc/services/auth/session.ts -> src/api/http.ts -> src/services/auth/refresh.ts -> src/services/auth/session.ts",
+    "stack": "ts"
+  },
+  {
+    "category": "dependencies",
+    "rule": "outdated-major",
+    "symbolPath": "react",
+    "files": [
+      "package.json"
+    ],
+    "metrics": {
+      "value": 1,
+      "threshold": 1
+    },
+    "snippet": "react: 18.3.1 -> 19.1.0",
+    "stack": "ts"
+  },
+  {
+    "category": "dependencies",
+    "rule": "outdated-major",
+    "symbolPath": "react-router-dom",
+    "files": [
+      "package.json"
+    ],
+    "metrics": {
+      "value": 1,
+      "threshold": 1
+    },
+    "snippet": "react-router-dom: 6.28.0 -> 7.6.2",
+    "stack": "ts"
+  },
+  {
+    "category": "dependencies",
+    "rule": "outdated-major",
+    "symbolPath": "webpack-dev-server",
+    "files": [
+      "package.json"
+    ],
+    "metrics": {
+      "value": 2,
+      "threshold": 1
+    },
+    "snippet": "webpack-dev-server: 3.11.3 -> 5.2.1",
+    "stack": "ts"
+  },
+  {
+    "category": "testing",
+    "rule": "missing-tests",
+    "symbolPath": "src/services/billing",
+    "files": [
+      "src/services/billing/invoice-calculator.ts",
+      "src/services/billing/tax.ts",
+      "src/services/billing/currency.ts"
+    ],
+    "metrics": {
+      "value": 3,
+      "fanIn": 9
+    },
+    "snippet": "Files with no matching test:\n- invoice-calculator.ts\n- tax.ts\n- currency.ts",
+    "stack": "ts"
+  },
+  {
+    "category": "testing",
+    "rule": "missing-tests",
+    "symbolPath": "src/services/auth",
+    "files": [
+      "src/services/auth/session.ts",
+      "src/services/auth/refresh.ts"
+    ],
+    "metrics": {
+      "value": 2,
+      "fanIn": 14
+    },
+    "snippet": "Files with no matching test:\n- session.ts\n- refresh.ts",
+    "stack": "ts"
+  },
+  {
+    "category": "testing",
+    "rule": "missing-tests",
+    "symbolPath": "src/pages/settings",
+    "files": [
+      "src/pages/settings/SettingsPage.tsx"
+    ],
+    "metrics": {
+      "value": 1,
+      "fanIn": 1
+    },
+    "snippet": "Files with no matching test:\n- SettingsPage.tsx",
+    "stack": "ts"
+  },
+  {
+    "category": "ops",
+    "rule": "hardcoded-url",
+    "symbolPath": "src/api/http",
+    "files": [
+      "src/api/http.ts"
+    ],
+    "metrics": {
+      "value": 2,
+      "fanIn": 14
+    },
+    "snippet": "8: const PROD_API = 'https://api.acme-internal.net/v2';\n9: const DEV_API = 'http://localhost:8080/v2';",
+    "stack": "ts"
+  },
+  {
+    "category": "ops",
+    "rule": "hardcoded-url",
+    "symbolPath": "src/services/telemetry/reporter",
+    "files": [
+      "src/services/telemetry/reporter.ts"
+    ],
+    "metrics": {
+      "value": 1,
+      "fanIn": 2
+    },
+    "snippet": "21: navigator.sendBeacon('https://telemetry.acme-internal.net/collect', payload);",
+    "stack": "ts"
+  },
+  {
+    "category": "ops",
+    "rule": "secret-literal",
+    "symbolPath": "src/services/maps/client",
+    "files": [
+      "src/services/maps/client.ts"
+    ],
+    "metrics": {
+      "value": 1,
+      "fanIn": 1
+    },
+    "snippet": "5: const MAPS_API_KEY = '<redacted>';",
+    "stack": "ts"
+  },
+  {
+    "category": "code",
+    "rule": "complexity",
+    "symbolPath": "src/store/users#usersReducer",
+    "files": [
+      "src/store/users.ts"
+    ],
+    "metrics": {
+      "value": 13,
+      "threshold": 10,
+      "loc": 150,
+      "fanIn": 8
+    },
+    "snippet": "complexity: Function 'usersReducer' has a complexity of 13. Maximum allowed is 10.\n\nexport function usersReducer(state = initial, action: Action): UsersState {\n  switch (action.type) {\n    case 'users/loaded': ...\n    case 'users/updated': ...\n    // 11 more cases\n  }\n}",
+    "stack": "ts"
+  }
+]
