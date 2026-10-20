@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { type DebtItem, type Dossier, JiraCreateJson, JiraSearchJson, type ScanContext } from "../../domain/schemas.js";
+import { type DebtItem, type Dossier, extraJiraLabels, JiraCreateJson, JiraSearchJson, type ScanContext } from "../../domain/schemas.js";
 import { assertBotIdentity, type JiraClient, type JiraIssue } from "../../integrations/jira/index.js";
 import { agentArgs } from "../../integrations/jira/jira-cli.js";
 import { type AgentTool, runAgent } from "../../integrations/llm/agent-loop.js";
@@ -9,7 +9,7 @@ import { renderPrompt, skillText } from "../../prompts.js";
 import type { StageHooks } from "../progress.js";
 
 export function labelsFor(item: DebtItem, repo: string): string[] {
-  return ["tech-debt", `td-sev-${(item.severity ?? "Low").toLowerCase()}`, `td-cat-${item.category}`, `td-fp-${item.fingerprint}`, `td-repo-${slug(repo)}`];
+  return ["tech-debt", `td-sev-${(item.severity ?? "Low").toLowerCase()}`, `td-cat-${item.category}`, `td-fp-${item.fingerprint}`, `td-repo-${slug(repo)}`, ...extraJiraLabels()];
 }
 
 const TicketerResult = z.object({ action: z.enum(["created", "existing"]), key: z.string().min(1) });
@@ -38,6 +38,8 @@ export async function ticket(
   const skill = skillText("jira-autonomous");
   const { projectKey, issueType, epicName, priorities } = ctx.profile.jira;
 
+  // Fingerprints don't include the repo, so in a project shared by many repos dedup must match the repo label too.
+  const repoLabel = `td-repo-${slug(ctx.repo)}`;
   const epicDescription = `Tech debt tracked for repository ${ctx.repo}.`;
   const epicKey = ctx.fallbacks.noEpicLink
     ? null
@@ -56,7 +58,7 @@ export async function ticket(
             epicName,
             descriptionWiki: epicDescription,
             priority: priorities.Medium,
-            labels: ["tech-debt", `td-repo-${slug(ctx.repo)}`],
+            labels: ["tech-debt", repoLabel, ...extraJiraLabels()],
           },
         })
       ).key;
@@ -69,8 +71,8 @@ export async function ticket(
     const summary = `[Tech Debt] ${item.title}`;
     const descriptionWiki = ticketDescription(ctx, item, dossier, ctx.fallbacks.noAttach);
     const result = await runTicketer(jira, usage, `${skill}\n\n${renderPrompt("ticketer.md", {})}`, {
-      isDedup: (jql) => jql.includes(fingerprintLabel),
-      matches: (issue) => issue.labels.includes(fingerprintLabel),
+      isDedup: (jql) => jql.includes(fingerprintLabel) && jql.includes(repoLabel),
+      matches: (issue) => issue.labels.includes(fingerprintLabel) && issue.labels.includes(repoLabel),
       projectKey,
       issueType,
       summary,
@@ -81,6 +83,7 @@ export async function ticket(
         projectKey,
         issueType,
         fingerprint: item.fingerprint,
+        repoLabel,
         summary,
         descriptionWiki,
         priority: priorities[item.severity ?? "Low"],

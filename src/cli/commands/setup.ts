@@ -2,7 +2,7 @@ import { accessSync, constants, existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Command } from "commander";
-import { JIRA_PROJECT_KEY, RepoProfile } from "../../domain/schemas.js";
+import { JIRA_PROJECT_KEY, RepoProfile, sharedJiraProject } from "../../domain/schemas.js";
 import { circuitModel, modelPrice } from "../../integrations/llm/pricing.js";
 import { expandPath, nearestExisting, tildePath } from "../../paths.js";
 import { preflight as runPreflight, type PreflightResult } from "../../preflight/index.js";
@@ -25,9 +25,13 @@ export async function setupProfile(repoPath: string, deps: SetupDeps): Promise<P
   deps.print(dim(existing ? "Editing the saved Repo Profile; press Enter to keep a value." : "No Repo Profile yet; press Enter to take a default."));
 
   deps.print(heading("Jira"));
-  const projectKey = (
-    await deps.ask("Project key", { default: existing?.jira.projectKey, validate: (v) => JIRA_PROJECT_KEY.test(v.trim().toUpperCase()) || "letters and digits, e.g. PROJ" })
-  ).toUpperCase();
+  const shared = sharedJiraProject();
+  if (shared) deps.print(dim(`Project key ${shared} comes from DEBTDOCTOR_JIRA_PROJECT (shared by every repo).`));
+  const projectKey =
+    shared ??
+    (
+      await deps.ask("Project key", { default: existing?.jira.projectKey, validate: (v) => JIRA_PROJECT_KEY.test(v.trim().toUpperCase()) || "letters and digits, e.g. PROJ" })
+    ).toUpperCase();
   const base = existing ?? defaultProfile(repo, projectKey);
   const epicName = await deps.ask("Epic name", { default: base.jira.epicName });
   const issueType = await deps.ask("Issue type", { default: base.jira.issueType });

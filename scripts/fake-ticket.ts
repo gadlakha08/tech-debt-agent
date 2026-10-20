@@ -52,7 +52,7 @@ const impact = `# Impact analysis
 
 const jira = createJiraClient();
 await assertBotIdentity(jira);
-const existing = await jira.search(`project = ${projectKey} AND labels = "td-fp-${fingerprint}"`);
+const existing = await jira.search(`project = ${projectKey} AND labels = "td-fp-${fingerprint}" AND labels = "td-repo-sample-app"`);
 if (existing.length) {
   console.log(`Already ticketed as ${existing.map((i) => i.key).join(", ")}; not creating a duplicate`);
   process.exit(0);

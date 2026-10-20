@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { parse, stringify } from "yaml";
-import { RepoProfile } from "../domain/schemas.js";
+import { RepoProfile, sharedJiraProject } from "../domain/schemas.js";
 import { debtdoctorHome, isInside } from "../paths.js";
 
 export const profilePath = (repo: string) => join(debtdoctorHome(), "profiles", `${repo}.yaml`);
@@ -26,18 +26,20 @@ export function defaultProfile(repo: string, projectKey: string): RepoProfile {
   });
 }
 
+/** The saved Repo Profile. With DEBTDOCTOR_JIRA_PROJECT set, its project wins and a repo with no profile gets the defaults. */
 export async function loadProfile(repo: string): Promise<RepoProfile | undefined> {
   const path = profilePath(repo);
+  const shared = sharedJiraProject();
   let text: string;
   try {
     text = await readFile(path, "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return shared ? defaultProfile(repo, shared) : undefined;
     throw err;
   }
   const result = RepoProfile.safeParse(parse(text));
   if (!result.success) throw new Error(`Invalid Repo Profile ${path}: ${result.error.message}`);
-  return result.data;
+  return shared ? { ...result.data, jira: { ...result.data.jira, projectKey: shared } } : result.data;
 }
 
 export async function saveProfile(profile: RepoProfile): Promise<string> {

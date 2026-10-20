@@ -102,6 +102,20 @@ export const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]+$/;
 export const JIRA_BOT = "techdebt-bot";
 /** Developer override: one named user (the Jira username, or the email's local part on Cloud) may write instead of the bot. */
 export const jiraAllowedUser = (): string | undefined => process.env.DEBTDOCTOR_JIRA_ALLOW_USER?.trim() || undefined;
+/** Labels added to every Epic and ticket, e.g. the one a board's filter selects on (DEBTDOCTOR_JIRA_EXTRA_LABELS, comma-separated). */
+export function extraJiraLabels(): string[] {
+  const labels = (process.env.DEBTDOCTOR_JIRA_EXTRA_LABELS ?? "").split(",").map((l) => l.trim()).filter(Boolean);
+  const bad = labels.filter((l) => /\s/.test(l));
+  if (bad.length) throw new Error(`DEBTDOCTOR_JIRA_EXTRA_LABELS: Jira labels cannot contain spaces (${bad.join(", ")})`);
+  return labels;
+}
+/** One Jira project for every repo (each repo gets its own Epic and td-repo label there); overrides the profile's projectKey. */
+export function sharedJiraProject(): string | undefined {
+  const key = process.env.DEBTDOCTOR_JIRA_PROJECT?.trim().toUpperCase();
+  if (!key) return undefined;
+  if (!JIRA_PROJECT_KEY.test(key)) throw new Error(`DEBTDOCTOR_JIRA_PROJECT "${key}" is not a Jira project key (letters and digits, e.g. PROJ)`);
+  return key;
+}
 
 export const RepoProfile = z.object({
   repo: z.string(),
