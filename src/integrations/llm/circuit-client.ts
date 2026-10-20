@@ -12,6 +12,8 @@ export interface ToolCall {
   id: string;
   type: "function";
   function: { name: string; arguments: string };
+  /** Gemini's thought_signature rides here; it must be sent back unchanged with the call or the next turn is refused. */
+  extra_content?: unknown;
 }
 
 export interface ToolSpec {
@@ -148,7 +150,7 @@ function normalizeToolCalls(value: unknown): ToolCall[] {
     const fnRecord = fn as Record<string, unknown>;
     if (typeof call.id !== "string" || typeof fnRecord.name !== "string") return [];
     const args = typeof fnRecord.arguments === "string" ? fnRecord.arguments : JSON.stringify(fnRecord.arguments ?? {});
-    return [{ id: call.id, type: "function", function: { name: fnRecord.name, arguments: args } }];
+    return [{ id: call.id, type: "function", function: { name: fnRecord.name, arguments: args }, ...(call.extra_content !== undefined ? { extra_content: call.extra_content } : {}) }];
   });
 }
 

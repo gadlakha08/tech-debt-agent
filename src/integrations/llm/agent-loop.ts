@@ -102,12 +102,24 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
  * $defs stay at the top so their #/$defs refs still resolve.
  */
 function resultParameters(schema: z.ZodType): { parameters: Record<string, unknown>; wrapped: boolean } {
-  const { $schema: _, $defs, ...json } = z.toJSONSchema(schema) as Record<string, unknown>;
+  const { $schema: _, $defs, ...json } = constToEnum(z.toJSONSchema(schema)) as Record<string, unknown>;
   if (json.type === "object") return { parameters: { ...json, ...($defs ? { $defs } : {}) }, wrapped: false };
   return {
     parameters: { type: "object", properties: { result: json }, required: ["result"], additionalProperties: false, ...($defs ? { $defs } : {}) },
     wrapped: true,
   };
+}
+
+/** Gemini ignores JSON Schema `const` (z.literal); a one-value `enum` means the same and every model honours it. */
+function constToEnum(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(constToEnum);
+  if (!node || typeof node !== "object") return node;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "const") out.enum = [value];
+    else out[key] = constToEnum(value);
+  }
+  return out;
 }
 
 function parseArguments(value: string): unknown {
