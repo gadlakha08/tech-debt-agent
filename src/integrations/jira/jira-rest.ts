@@ -33,6 +33,14 @@ export async function myPermissions(projectKey: string): Promise<JiraPermissions
   return { BROWSE_PROJECTS: has("BROWSE_PROJECTS"), CREATE_ISSUES: has("CREATE_ISSUES"), ADD_COMMENTS: has("ADD_COMMENTS"), EDIT_ISSUES: has("EDIT_ISSUES"), CREATE_ATTACHMENTS: has("CREATE_ATTACHMENTS") };
 }
 
+/** GET /rest/api/2/project/{key}: the issue type names the project offers. */
+export async function issueTypes(projectKey: string): Promise<string[]> {
+  const { baseUrl, headers } = config();
+  const res = await check(await fetch(`${baseUrl}/rest/api/2/project/${encodeURIComponent(projectKey)}`, { headers }), `project ${projectKey}`);
+  const { issueTypes: types = [] } = (await res.json()) as { issueTypes?: { name: string }[] };
+  return types.map((t) => t.name);
+}
+
 /** GET /rest/api/2/myself: the Jira username DEBTDOCTOR_JIRA_TOKEN belongs to. */
 export async function myself(): Promise<string> {
   const { baseUrl, headers } = config();

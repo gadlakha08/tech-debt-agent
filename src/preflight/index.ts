@@ -1,7 +1,7 @@
 import clipboard from "clipboardy";
 import type { Fallbacks, RepoKind, RepoProfile } from "../domain/schemas.js";
 import type { JiraPermissions } from "../integrations/jira/index.js";
-import { myPermissions } from "../integrations/jira/jira-rest.js";
+import { issueTypes, myPermissions } from "../integrations/jira/jira-rest.js";
 import { adminRequest } from "./admin-request.js";
 import { type CheckResult, environmentChecks, evaluatePermissions } from "./checks.js";
 import { askChoice, type PreflightChoice } from "./prompt.js";
@@ -24,6 +24,8 @@ export interface PreflightOptions {
 export interface PreflightDeps {
   environment: () => Promise<CheckResult[]>;
   permissions: (projectKey: string) => Promise<JiraPermissions>;
+  /** The project's issue type names; omitted, the issue type check is skipped. */
+  issueTypes?: (projectKey: string) => Promise<string[]>;
   ask: (blocking: boolean) => Promise<PreflightChoice>;
   copy: (text: string) => Promise<void>;
   print: (line: string) => void;
@@ -32,6 +34,7 @@ export interface PreflightDeps {
 export const defaultDeps = (profile: RepoProfile, opts: PreflightOptions): PreflightDeps => ({
   environment: () => environmentChecks(opts),
   permissions: myPermissions,
+  issueTypes,
   ask: askChoice,
   copy: (t) => clipboard.write(t),
   print: (l) => console.log(l),
@@ -61,6 +64,18 @@ export async function preflight(profile: RepoProfile, opts: PreflightOptions, de
       } catch (err) {
         report.push({ name: `Jira permissions (${projectKey})`, ok: false, blocking: true, detail: (err as Error).message });
       }
+    if (!opts.dryRun && deps.issueTypes) {
+      // the ticketer may only create these types, so a name the project lacks fails every ticket
+      const wanted = [profile.jira.issueType, "Epic"];
+      const name = `Jira issue types (${wanted.join(", ")})`;
+      try {
+        const types = await deps.issueTypes(projectKey);
+        const absent = wanted.filter((t) => !types.includes(t));
+        report.push({ name, ok: absent.length === 0, blocking: true, detail: absent.length ? `${projectKey} has no ${absent.join(", ")}; it offers ${types.join(", ")}. Fix issueType with dd setup` : "ok" });
+      } catch (err) {
+        report.push({ name, ok: false, blocking: true, detail: (err as Error).message });
+      }
+    }
 
     for (const r of report) deps.print(`${r.ok ? "✔" : r.blocking ? "✖" : "!"} ${r.name}: ${r.detail}`);
     if (missing.length) {
