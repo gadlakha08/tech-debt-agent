@@ -1,5 +1,5 @@
 import { requiredTools, toolAvailable } from "../analyzers/index.js";
-import { type Fallbacks, JIRA_BOT, type RepoKind } from "../domain/schemas.js";
+import { type Fallbacks, JIRA_BOT, jiraAllowedUser, type RepoKind } from "../domain/schemas.js";
 import { defaultBranch } from "../integrations/git/worktree.js";
 import { assertBotIdentity, createJiraClient, type JiraPermissions } from "../integrations/jira/index.js";
 import { CIRCUIT_CHAT_ENV } from "../integrations/llm/circuit-client.js";
@@ -78,9 +78,10 @@ export async function environmentChecks(opts: { repo: RepoKind; repoPath?: strin
   ];
   if (!opts.dryRun)
     checks.push(
-      check(`Jira identity (${JIRA_BOT})`, true, async () => {
+      check(`Jira identity (${jiraAllowedUser() ? `${JIRA_BOT} or ${jiraAllowedUser()}` : JIRA_BOT})`, true, async () => {
         await assertBotIdentity(createJiraClient());
-        return `jira-cli and DEBTDOCTOR_JIRA_TOKEN both act as ${JIRA_BOT}`;
+        const override = jiraAllowedUser() ? ` (DEBTDOCTOR_JIRA_ALLOW_USER is set: tickets may be created as ${jiraAllowedUser()})` : "";
+        return `jira-cli and DEBTDOCTOR_JIRA_TOKEN are allowed${override}`;
       }),
     );
   checks.push(...analyzerTools(opts.repo));

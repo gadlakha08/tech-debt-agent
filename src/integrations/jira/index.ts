@@ -1,4 +1,4 @@
-import { JIRA_BOT, JiraCreateJson, JiraSearchJson, JiraUserJson } from "../../domain/schemas.js";
+import { JIRA_BOT, JiraCreateJson, JiraSearchJson, JiraUserJson, jiraAllowedUser } from "../../domain/schemas.js";
 import { runJiraCli } from "./jira-cli.js";
 import * as rest from "./jira-rest.js";
 
@@ -47,8 +47,9 @@ export interface JiraClient {
 /** Throws unless both jira-cli and the REST token act as techdebt-bot. Run before any Jira write. */
 export async function assertBotIdentity(jira: Pick<JiraClient, "identity">): Promise<void> {
   const { cli, rest } = await jira.identity();
-  const wrong = [cli !== JIRA_BOT && `jira-cli --instance ${JIRA_BOT} is logged in as "${cli}"`, rest !== JIRA_BOT && `DEBTDOCTOR_JIRA_TOKEN belongs to "${rest}"`].filter(Boolean);
-  if (wrong.length) throw new Error(`Jira writes must be made as ${JIRA_BOT} only: ${wrong.join("; ")}`);
+  const allowed = [JIRA_BOT, jiraAllowedUser()].filter(Boolean);
+  const wrong = [!allowed.includes(cli) && `jira-cli --instance ${JIRA_BOT} is logged in as "${cli}"`, !allowed.includes(rest) && `DEBTDOCTOR_JIRA_TOKEN belongs to "${rest}"`].filter(Boolean);
+  if (wrong.length) throw new Error(`Jira writes must be made as ${allowed.join(" or ")} only: ${wrong.join("; ")}`);
 }
 
 /** Real client: jira-cli (--instance techdebt-bot) for issue operations, REST for permissions and attachments. */

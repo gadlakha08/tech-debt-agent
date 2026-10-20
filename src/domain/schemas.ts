@@ -100,6 +100,8 @@ export type Dossier = z.infer<typeof Dossier>;
 export const JIRA_PROJECT_KEY = /^[A-Z][A-Z0-9_]+$/;
 /** The generic Jira user every pipeline write is made as: its jira-cli instance name and its Jira username. Not configurable. */
 export const JIRA_BOT = "techdebt-bot";
+/** Developer override: one named user (the Jira username, or the email's local part on Cloud) may write instead of the bot. */
+export const jiraAllowedUser = (): string | undefined => process.env.DEBTDOCTOR_JIRA_ALLOW_USER?.trim() || undefined;
 
 export const RepoProfile = z.object({
   repo: z.string(),
@@ -163,7 +165,13 @@ export const JiraCreateJson = wrapped(z.object({ key: z.string().min(1) }));
 /** GET /rest/api/2/issue/{key}?fields=labels */
 export const JiraIssueLabelsJson = z.object({ fields: z.object({ labels: z.array(z.string()).default([]) }) });
 /** `jira-cli whoami` and GET /rest/api/2/myself */
-export const JiraUserJson = wrapped(z.object({ name: z.string().min(1) }));
+/** Server/DC users have a name; Jira Cloud hides it, so the account's email local part (techdebt-bot@…) is the username there. */
+export const JiraUserJson = wrapped(
+  z
+    .object({ name: z.string().min(1).optional(), emailAddress: z.string().min(1).optional() })
+    .transform((u) => ({ name: u.name ?? u.emailAddress?.split("@")[0] ?? "" }))
+    .refine((u) => u.name !== "", "Jira returned neither a username nor an email address"),
+);
 
 /** GET /rest/api/2/mypermissions */
 export const JiraMyPermissionsJson = z.object({

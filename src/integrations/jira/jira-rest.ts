@@ -8,9 +8,14 @@ const PERMISSIONS = ["BROWSE_PROJECTS", "CREATE_ISSUES", "ADD_COMMENTS", "EDIT_I
 function config() {
   const baseUrl = process.env.DEBTDOCTOR_JIRA_BASE_URL?.replace(/\/+$/, "");
   const token = process.env.DEBTDOCTOR_JIRA_TOKEN;
+  const email = process.env.DEBTDOCTOR_JIRA_EMAIL;
   if (!baseUrl) throw new Error("DEBTDOCTOR_JIRA_BASE_URL is not set");
   if (!token) throw new Error("DEBTDOCTOR_JIRA_TOKEN is not set");
-  return { baseUrl, headers: { authorization: `Bearer ${token}`, accept: "application/json" } };
+  // Jira Cloud API tokens are Basic email:token; Server/DC personal access tokens are Bearer.
+  if (!email && /\.atlassian\.net$/i.test(new URL(baseUrl).hostname))
+    throw new Error("Jira Cloud needs DEBTDOCTOR_JIRA_EMAIL (the API token owner's email) next to DEBTDOCTOR_JIRA_TOKEN");
+  const authorization = email ? `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}` : `Bearer ${token}`;
+  return { baseUrl, headers: { authorization, accept: "application/json" } };
 }
 
 async function check(res: Response, what: string): Promise<Response> {
