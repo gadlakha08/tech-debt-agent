@@ -40,9 +40,27 @@ export async function runJiraCli(args: string[]): Promise<unknown> {
   assertAllowed(args);
   const bin = await jiraCliBinary();
   if (!bin) throw new Error("jira-cli not found: install it, or set DEBTDOCTOR_JIRA_CLI");
-  const res = await run(bin, ["--instance", JIRA_BOT, "--format", "json", ...args], { timeoutMs: 180_000 });
+  const res = await run(bin, ["--instance", JIRA_BOT, "--format", "json", ...args], { timeoutMs: 180_000, env: credentialEnv() });
   if (res.exitCode !== 0) throw new Error(`jira-cli ${args[0]} failed (${res.exitCode}): ${res.stderr.trim().slice(-500)}`);
   return parseJson(res.stdout);
+}
+
+/**
+ * The .env Jira credentials as jira-cli's per-instance env vars, so jira-cli needs no `config` of its own.
+ * Without DEBTDOCTOR_JIRA_BASE_URL and DEBTDOCTOR_JIRA_TOKEN, jira-cli falls back to its saved techdebt-bot instance.
+ */
+function credentialEnv(): Record<string, string> | undefined {
+  const { DEBTDOCTOR_JIRA_BASE_URL: url, DEBTDOCTOR_JIRA_TOKEN: token, DEBTDOCTOR_JIRA_EMAIL: email } = process.env;
+  if (!url || !token) return undefined;
+  const prefix = `JIRA_${JIRA_BOT.toUpperCase()}`;
+  const cloud = /\.atlassian\.net$/i.test(new URL(url).hostname);
+  return {
+    [`${prefix}_URL`]: url,
+    [`${prefix}_API_TOKEN`]: token,
+    [`${prefix}_CLOUD`]: String(cloud),
+    // Cloud and Server basic auth log in as email/username:token; a Server PAT needs no username.
+    ...(email ? { [`${prefix}_USERNAME`]: email, ...(cloud ? {} : { [`${prefix}_AUTH`]: "basic" }) } : { [`${prefix}_AUTH`]: "pat" }),
+  };
 }
 
 /**
