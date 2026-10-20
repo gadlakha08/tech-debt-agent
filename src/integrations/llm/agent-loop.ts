@@ -43,6 +43,7 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
   ];
   let validationRetries = 0;
   let lastValidationError = "";
+  let lastToolFailure = "";
 
   for (let step = 0; step < maxSteps; step += 1) {
     const response = await chat({ stage: opts.stage, messages, tools, toolChoice: "auto" }, opts.usage);
@@ -72,6 +73,7 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
           result = await tool.run(parseArguments(call.function.arguments));
         } catch (error) {
           result = `Tool failed: ${error instanceof Error ? error.message : String(error)}`;
+          lastToolFailure = `${tool.name}: ${result.slice(0, 500)}`;
         }
         messages.push({ role: "tool", tool_call_id: call.id, content: result });
       }
@@ -94,7 +96,9 @@ export async function runAgent<T extends z.ZodType>(opts: RunAgentOptions<T>): P
     messages.push(response.message, { role: "user", content: `No result was returned. Call the ${resultName} tool with your final answer.` });
   }
 
-  throw new Error(`${opts.stage}: agent exceeded its ${maxSteps}-step limit${lastValidationError ? `; last schema error: ${lastValidationError}` : ""}.`);
+  throw new Error(
+    `${opts.stage}: agent exceeded its ${maxSteps}-step limit${lastValidationError ? `; last schema error: ${lastValidationError}` : ""}${lastToolFailure ? `; last tool failure: ${lastToolFailure}` : ""}.`,
+  );
 }
 
 /**

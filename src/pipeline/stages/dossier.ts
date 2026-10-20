@@ -151,8 +151,9 @@ export function factSections(item: DebtItem, dependents: string[] | undefined, t
   ].join("\n");
 }
 
+/** A heading counts when it starts with the required text, so `## Option 1: Extract a service` or `## **Option 1**` is fine (but not `## Option 10`). */
 function missingHeadings(file: string, markdown: string): string[] {
-  return requiredHeadings(file).filter((heading) => !new RegExp(`^#{1,6}\\s+${escapeRegExp(heading)}\\s*$`, "im").test(markdown));
+  return requiredHeadings(file).filter((heading) => !new RegExp(`^#{1,6}\\s+\\**${escapeRegExp(heading)}(?!\\w)`, "im").test(markdown));
 }
 
 function escapeRegExp(value: string): string {
