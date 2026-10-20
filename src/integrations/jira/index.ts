@@ -57,13 +57,21 @@ export function createJiraClient(): JiraClient {
   const cli = runJiraCli;
   return {
     async search(jql) {
-      const { issues } = JiraSearchJson.parse(await cli(["search", "--jql", jql, "--limit", "1000", "--fields", "summary,labels,status,resolution"]));
+      const { issues } = JiraSearchJson.parse(await cli(["search", "--jql", jql, "--limit", "1000", "--fields", "summary,labels,status"]));
+      // jira-cli can't return resolution as a field (Won't Fix issues usually show status Done), so ask JQL which ones it is.
+      // An instance without a Won't Fix resolution rejects the query; then only a Won't Fix status counts.
+      const wontFix = issues.length
+        ? await cli(["search", "--jql", `(${jql}) AND resolution = "Won't Fix"`, "--limit", "1000", "--fields", "key"]).then(
+            (out) => new Set(JiraSearchJson.parse(out).issues.map((i) => i.key)),
+            () => new Set<string>(),
+          )
+        : new Set<string>();
       return issues.map((i) => ({
         key: i.key,
         summary: i.summary ?? i.fields?.summary ?? "",
         labels: i.labels ?? i.fields?.labels ?? [],
-        status: i.status?.name ?? i.fields?.status?.name,
-        resolution: i.resolution?.name ?? i.fields?.resolution?.name ?? undefined,
+        status: i.status ?? i.fields?.status,
+        resolution: wontFix.has(i.key) ? "Won't Fix" : undefined,
       }));
     },
     async create(input) {

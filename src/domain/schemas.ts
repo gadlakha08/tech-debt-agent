@@ -158,23 +158,24 @@ export const ScanContext = z.object({
 });
 export type ScanContext = z.infer<typeof ScanContext>;
 
+/** A Jira field that is a plain name in jira-cli's output (`"Done"`) or a REST object (`{ name: "Done" }`); always the name. */
+const named = z.union([z.string(), z.object({ name: z.string() }).transform((v) => v.name)]);
 /** jira-cli --json output: issues carry summary/labels either at the top level or under fields. Payloads may be wrapped in { data }. */
 const JiraIssueJson = z.object({
   key: z.string(),
   summary: z.string().optional(),
   labels: z.array(z.string()).optional(),
-  status: z.object({ name: z.string() }).optional(),
-  resolution: z.object({ name: z.string() }).nullable().optional(),
+  status: named.optional(),
   fields: z.object({
     summary: z.string().optional(),
     labels: z.array(z.string()).optional(),
-    status: z.object({ name: z.string() }).optional(),
-    resolution: z.object({ name: z.string() }).nullable().optional(),
+    status: named.optional(),
   }).optional(),
 });
 const unwrap = (p: unknown) => (p && typeof p === "object" && "data" in p ? (p as { data: unknown }).data : p);
 const wrapped = <T extends z.ZodType>(t: T) => z.preprocess(unwrap, t);
-export const JiraSearchJson = wrapped(z.object({ issues: z.array(JiraIssueJson) }));
+/** jira-cli search prints a bare array of issues; older output wraps it in { issues }. */
+export const JiraSearchJson = wrapped(z.union([z.array(JiraIssueJson).transform((issues) => ({ issues })), z.object({ issues: z.array(JiraIssueJson) })]));
 export const JiraCreateJson = wrapped(z.object({ key: z.string().min(1) }));
 /** GET /rest/api/2/issue/{key}?fields=labels */
 export const JiraIssueLabelsJson = z.object({ fields: z.object({ labels: z.array(z.string()).default([]) }) });
