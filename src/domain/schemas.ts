@@ -86,11 +86,13 @@ export const DebtItem = z.object({
 });
 export type DebtItem = z.infer<typeof DebtItem>;
 
-/** Lite Dossier: the two markdown files attached to the Ticket. */
+/** Four-file Dossier attached to the Ticket. */
 export const Dossier = z.object({
   fingerprint: z.string().length(10),
   contextMd: z.string(),
   impactMd: z.string(),
+  designOptionsMd: z.string(),
+  implementationPlanMd: z.string(),
 });
 export type Dossier = z.infer<typeof Dossier>;
 
@@ -145,7 +147,14 @@ const JiraIssueJson = z.object({
   key: z.string(),
   summary: z.string().optional(),
   labels: z.array(z.string()).optional(),
-  fields: z.object({ summary: z.string().optional(), labels: z.array(z.string()).optional() }).optional(),
+  status: z.object({ name: z.string() }).optional(),
+  resolution: z.object({ name: z.string() }).nullable().optional(),
+  fields: z.object({
+    summary: z.string().optional(),
+    labels: z.array(z.string()).optional(),
+    status: z.object({ name: z.string() }).optional(),
+    resolution: z.object({ name: z.string() }).nullable().optional(),
+  }).optional(),
 });
 const unwrap = (p: unknown) => (p && typeof p === "object" && "data" in p ? (p as { data: unknown }).data : p);
 const wrapped = <T extends z.ZodType>(t: T) => z.preprocess(unwrap, t);
@@ -160,4 +169,3 @@ export const JiraUserJson = wrapped(z.object({ name: z.string().min(1) }));
 export const JiraMyPermissionsJson = z.object({
   permissions: z.record(z.string(), z.object({ havePermission: z.boolean().optional() })).default({}),
 });
-

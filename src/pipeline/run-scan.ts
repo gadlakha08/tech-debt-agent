@@ -19,6 +19,7 @@ import { consolidate } from "./stages/consolidate.js";
 import { buildDossiers } from "./stages/dossier.js";
 import { score } from "./stages/score.js";
 import { ticket } from "./stages/ticket.js";
+import { reconcileTickets, type SuppressedTicket } from "./stages/reconcile.js";
 
 export interface ScanOptions {
   repoPath: string;
@@ -85,20 +86,30 @@ export async function runScan(opts: ScanOptions, progress: Progress = silent): P
     const findings = classifications.flatMap((entry): Finding[] => (entry.type === "finding" ? [entry.finding] : []));
     const defects = classifications.flatMap((entry): Defect[] => (entry.type === "defect" ? [entry.defect] : []));
     const items = consolidate(findings);
+    const jira = opts.dryRun ? undefined : createJiraClient();
+    let activeItems = items;
+    let suppressed: SuppressedTicket[] = [];
+    if (jira) {
+      const reconciled = await step(progress, "Reconciling existing Jira debt", items.length,
+        () => reconcileTickets(ctx, items, jira),
+        (result) => `${result.suppressed.length} Won't Fix suppressed · ${result.disappeared} disappeared · ${result.reappeared} returned`);
+      activeItems = reconciled.activeItems;
+      suppressed = reconciled.suppressed;
+    }
     const relatedTests = relatedTestsFinder(co.worktree, stack, scanned.files);
-    const scored = await step(progress, "Scoring Debt Items", items.length,
-      () => score(ctx, items, scanned.churn, usage, hooks(progress)),
+    const scored = await step(progress, "Scoring Debt Items", activeItems.length,
+      () => score(ctx, activeItems, scanned.churn, usage, hooks(progress)),
       (all) => `${all.length} items: ${severityCounts(all)}`);
     const selected = cut(scored, { floor: 10, cap: opts.max ?? 15, uncap: opts.uncap });
     progress.log(`  Cut: ${selected.cut.length} of ${scored.length} (${severityCounts(selected.cut)})`);
     const dossiers = await step(progress, "Writing Dossiers", selected.cut.length,
       () => buildDossiers(ctx, selected.cut, { ...scanned, relatedTests }, usage, hooks(progress)),
-      (all) => `${all.length} × context.md + impact.md`);
+      (all) => `${all.length} × context.md + impact.md + design-options.md + implementation-plan.md`);
     let cutItems = selected.cut;
     if (opts.dryRun) progress.log("  Jira ticketing skipped (--dry-run)");
     else
       cutItems = await step(progress, "Ticketing in Jira as techdebt-bot", selected.cut.length,
-        () => ticket(ctx, selected.cut, dossiers, createJiraClient(), usage, hooks(progress)),
+        () => ticket(ctx, selected.cut, dossiers, jira!, usage, hooks(progress)),
         (all) => all.map((item) => item.ticketKey).join(", "));
 
     const report = await writeReport(runDir, {
@@ -106,6 +117,7 @@ export async function runScan(opts: ScanOptions, progress: Progress = silent): P
       sha: co.sha,
       cut: cutItems,
       belowCut: selected.belowCut,
+      suppressed,
       defects,
       includeDefects: opts.includeDefects || profile.includeDefects,
       usage,

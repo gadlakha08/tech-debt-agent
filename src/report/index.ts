@@ -11,6 +11,7 @@ export interface ScanReport {
   cut: DebtItem[];
   belowCut: DebtItem[];
   defects: Defect[];
+  suppressed: { fingerprint: string; ticketKey: string; summary: string }[];
   includeDefects: boolean;
   usage: UsageMeter;
   /** CircuIT deployment the Scan ran on. */
@@ -34,6 +35,7 @@ export async function writeReport(runDir: string, report: ScanReport): Promise<{
     sha: report.sha,
     cut: report.cut,
     belowCut: report.belowCut,
+    suppressed: report.suppressed,
     defectCount: report.defects.length,
     ...(report.includeDefects ? { defects: report.defects } : {}),
     usage: { byStage, totals },

@@ -1,6 +1,6 @@
 # DebtDoctor
 
-Scans one repository for technical debt, ranks it with a Rubric, and turns the Cut into Jira tickets, each with a Lite Dossier (`context.md`, `impact.md`). Developers then use the `techdebt-*` plugin skills to ask about, plan and implement a ticket.
+Scans one repository for technical debt, ranks it with a Rubric, and turns the Cut into Jira tickets, each with a four-file Dossier (`context.md`, `impact.md`, `design-options.md`, `implementation-plan.md`). Developers then use the `techdebt-*` plugin skills to ask about, plan and implement a ticket.
 
 Deterministic analyzers produce evidence; gpt-5-nano (via the CircuIT gateway) classifies, scores Impact/Risk, writes the Dossier and drives ticketing.
 

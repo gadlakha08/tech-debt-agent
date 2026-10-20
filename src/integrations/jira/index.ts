@@ -6,6 +6,8 @@ export interface JiraIssue {
   key: string;
   summary: string;
   labels: string[];
+  status?: string;
+  resolution?: string;
 }
 
 export interface CreateIssueInput {
@@ -54,8 +56,14 @@ export function createJiraClient(): JiraClient {
   const cli = runJiraCli;
   return {
     async search(jql) {
-      const { issues } = JiraSearchJson.parse(await cli(["search", "--jql", jql, "--limit", "50", "--fields", "summary,labels"]));
-      return issues.map((i) => ({ key: i.key, summary: i.summary ?? i.fields?.summary ?? "", labels: i.labels ?? i.fields?.labels ?? [] }));
+      const { issues } = JiraSearchJson.parse(await cli(["search", "--jql", jql, "--limit", "1000", "--fields", "summary,labels,status,resolution"]));
+      return issues.map((i) => ({
+        key: i.key,
+        summary: i.summary ?? i.fields?.summary ?? "",
+        labels: i.labels ?? i.fields?.labels ?? [],
+        status: i.status?.name ?? i.fields?.status?.name,
+        resolution: i.resolution?.name ?? i.fields?.resolution?.name ?? undefined,
+      }));
     },
     async create(input) {
       const { key } = JiraCreateJson.parse(

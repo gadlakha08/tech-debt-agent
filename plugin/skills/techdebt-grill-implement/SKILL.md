@@ -6,7 +6,7 @@ description: Grill the user on edge cases for a tech-debt Jira ticket before imp
 Works in Claude Code and Codex: plain instructions, no runtime-specific tools. Jira access goes through the user's own `jira-issues` skill.
 
 ## 1. Load
-Everything `techdebt-implement` loads (ticket, Fingerprint, Scanned Commit, `context.md`, `impact.md`, latest `[techdebt-plan vN]`), then run its drift check and keep the result: drift is the first thing to grill on.
+Everything `techdebt-implement` loads (ticket, Fingerprint, Scanned Commit, all four Dossier files, latest `[techdebt-plan vN]`), then run its drift check and keep the result: drift is the first thing to grill on.
 
 ## 2. Find the facts yourself
 Before asking anything, look up what the code can tell you: callers of the symbols the plan touches (search the repo), config and feature flags that reference them, public APIs or serialised formats they expose, and the tests that cover them today. Never ask the user for a fact you can find.

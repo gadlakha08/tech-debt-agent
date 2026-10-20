@@ -98,6 +98,8 @@ export async function ticket(
         try {
           await jira.attach(result.key, join(ctx.runDir, item.fingerprint, "context.md"));
           await jira.attach(result.key, join(ctx.runDir, item.fingerprint, "impact.md"));
+          await jira.attach(result.key, join(ctx.runDir, item.fingerprint, "design-options.md"));
+          await jira.attach(result.key, join(ctx.runDir, item.fingerprint, "implementation-plan.md"));
         } catch (error) {
           // Attachments are optional only when preflight reported the noAttach fallback.
           throw new Error(`Ticket ${result.key} was created, but its Dossier could not be attached: ${error instanceof Error ? error.message : String(error)}`);
@@ -209,7 +211,14 @@ function ticketDescription(ctx: ScanContext, item: DebtItem, dossier: Dossier, i
     evidence: evidence || "No evidence text supplied.",
     fingerprint: item.fingerprint,
     sha: ctx.sha,
-    dossier: inlineDossier ? `\nh2. Context dossier\n${wiki(dossier.contextMd)}\n\nh2. Impact dossier\n${wiki(dossier.impactMd)}` : "",
+    dossier: inlineDossier
+      ? [
+          ["Context dossier", dossier.contextMd],
+          ["Impact dossier", dossier.impactMd],
+          ["Design options", dossier.designOptionsMd],
+          ["Implementation plan", dossier.implementationPlanMd],
+        ].map(([heading, content]) => `\nh2. ${heading}\n${wiki(content ?? "")}`).join("\n")
+      : "",
   });
 }
 

@@ -1,13 +1,14 @@
 ---
 name: techdebt-implement
-description: Implement a tech-debt Jira ticket created by the tech-debt agent from its latest [techdebt-plan vN] comment, after a drift check, and open a PR. Use when the user runs /techdebt-implement <KEY>.
+description: Implement a tech-debt Jira ticket created by the tech-debt agent from its implementation-plan Dossier and latest [techdebt-plan vN] comment, after a drift check, and open a PR. Use when the user runs /techdebt-implement <KEY>.
 ---
 
 Works in Claude Code and Codex: plain instructions, no runtime-specific tools. Jira access goes through the user's own `jira-issues` skill. Run inside the user's clone of the ticket's repo.
 
 ## 1. Load
-- Do step 1 of `techdebt-ask`: ticket, Fingerprint, Scanned Commit, `context.md`, `impact.md`, latest `[techdebt-plan vN]` comment.
-- No plan comment: draft one as in `techdebt-ask` step 3, get confirmation, post it as `[techdebt-plan v1]`, then continue.
+- Do step 1 of `techdebt-ask`: ticket, Fingerprint, Scanned Commit, all four Dossier attachments (`context.md`, `impact.md`, `design-options.md`, `implementation-plan.md`), latest `[techdebt-plan vN]` comment.
+- Use the Dossier's recommended option and implementation plan as the starting proposal. A later `[techdebt-plan vN]` comment takes precedence.
+- No plan comment: show the Dossier plan and any needed refinements as in `techdebt-ask` step 3, get confirmation, post it as `[techdebt-plan v1]`, then continue.
 
 ## 2. Drift check (stop on drift)
 - `git fetch origin` and compare against the default branch.

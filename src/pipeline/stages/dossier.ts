@@ -10,6 +10,8 @@ import type { StageHooks } from "../progress.js";
 
 const CONTEXT = "dossier-context.md";
 const IMPACT = "dossier-impact.md";
+const DESIGN_OPTIONS = "dossier-design-options.md";
+const IMPLEMENTATION_PLAN = "dossier-implementation-plan.md";
 /** Dependents passed to the model; the appended section lists more. */
 const MODEL_DEPENDENTS = 25;
 const LISTED = 50;
@@ -25,7 +27,7 @@ export interface DossierFacts {
 }
 
 /**
- * Fills prompts/dossier-{context,impact}.md per Debt Item in the Cut; regenerates once if a heading is missing.
+ * Fills four Dossier documents per Debt Item in the Cut; regenerates once if a heading is missing.
  * impact.md then gets the Dependents, Tests and Recent changes sections from facts, written by code so the model can't drop or alter them.
  */
 export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], facts: DossierFacts, usage: UsageMeter, hooks: StageHooks = {}): Promise<Dossier[]> {
@@ -62,19 +64,23 @@ export async function buildDossiers(ctx: ScanContext, cut: DebtItem[], facts: Do
       defaultBranch: ctx.defaultBranch,
       stackSummary: ctx.stackSummary,
     });
-    const [contextMd, impactMd] = await Promise.all([
+    const [contextMd, impactMd, designOptionsMd, implementationPlanMd] = await Promise.all([
       writeDocument(CONTEXT, "context.md", skeleton(CONTEXT, ctx, item), source, usage, item),
       writeDocument(IMPACT, "impact.md", skeleton(IMPACT, ctx, item), source, usage, item).then(
         (markdown) => `${markdown.trimEnd()}\n\n${factSections(item, graphed ? dependents : undefined, tests, recentCommits, facts.churnDays)}`,
       ),
+      writeDocument(DESIGN_OPTIONS, "design-options.md", skeleton(DESIGN_OPTIONS, ctx, item), source, usage, item),
+      writeDocument(IMPLEMENTATION_PLAN, "implementation-plan.md", skeleton(IMPLEMENTATION_PLAN, ctx, item), source, usage, item),
     ]);
 
-    const dossier: Dossier = { fingerprint: item.fingerprint, contextMd, impactMd };
+    const dossier: Dossier = { fingerprint: item.fingerprint, contextMd, impactMd, designOptionsMd, implementationPlanMd };
     const itemDir = join(ctx.runDir, item.fingerprint);
     await mkdir(itemDir, { recursive: true });
     await Promise.all([
       writeFile(join(itemDir, "context.md"), dossier.contextMd, "utf8"),
       writeFile(join(itemDir, "impact.md"), dossier.impactMd, "utf8"),
+      writeFile(join(itemDir, "design-options.md"), dossier.designOptionsMd, "utf8"),
+      writeFile(join(itemDir, "implementation-plan.md"), dossier.implementationPlanMd, "utf8"),
     ]);
     return dossier;
   }).finally(() => hooks.tick?.(item.title))));

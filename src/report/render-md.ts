@@ -20,6 +20,12 @@ export function renderMarkdown(report: ScanReport): string {
     "",
     ...renderItems(report.belowCut),
     "",
+    `## Suppressed: Won't Fix (${report.suppressed.length})`,
+    "",
+    ...(report.suppressed.length
+      ? report.suppressed.map((item) => `- \`${item.ticketKey}\` · \`${item.fingerprint}\` · ${escapeCell(item.summary)}`)
+      : ["No suppressed tickets."]),
+    "",
     `## Defects (${report.defects.length})`,
   ];
   if (report.includeDefects && report.defects.length) {
